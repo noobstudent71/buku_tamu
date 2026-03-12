@@ -1,0 +1,449 @@
+import openpyxl
+import os
+from datetime import datetime
+from openpyxl.styles import Font, Alignment, Border, Side
+from .forms import TamuForm
+from .models import BukuTamu
+from collections import Counter 
+import json
+from django.http import HttpResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from django.db.models import Case, When, Value, IntegerField
+from django.core.paginator import Paginator 
+from django.db.models import Q
+from django.db.models import Count
+from django.db.models.functions import ExtractMonth
+from django.utils.timezone import localdate, make_aware
+from .models import PIC, Instansi, BukuTamu
+from django.contrib.auth import logout
+from django.contrib.auth import authenticate, login, logout
+from django.http import JsonResponse
+
+def search_perusahaan(request):
+    # Tangkap huruf yang sedang diketik user (misal: "Otsu")
+    query = request.GET.get('q', '')
+    
+    if query:
+        # Cari di database: Perusahaan yang mengandung kata (icontains) dari query
+        # values_list flat=True: Ambil namanya saja, distinct(): Jangan ada nama dobel
+        # [:10] = Batasi maksimal 10 saran agar server tidak berat
+        hasil = BukuTamu.objects.filter(perusahaan__icontains=query).values_list('perusahaan', flat=True).distinct()[:10]
+        data = list(hasil)
+    else:
+        data = []
+        
+    # Kembalikan jawaban dalam bentuk JSON (Bahasa universal antar sistem)
+    return JsonResponse(data, safe=False)
+
+
+
+def login_view(request):
+    if request.method == 'POST':
+        u = request.POST.get('username')
+        p = request.POST.get('password')
+        
+        user = authenticate(request, username=u, password=p)
+        
+        if user is not None:
+            login(request, user)
+            # LOGIKA PENGALIHAN (REDIRECT) BERDASARKAN GRUP
+            if user.groups.filter(name='SATPAM').exists():
+                return redirect('daftar_tamu') # Ke halaman monitor tamu
+            elif user.groups.filter(name='KANTOR').exists() or user.is_superuser:
+                return redirect('dashboard_analytics') # Ke halaman grafik
+            else:
+                return redirect('pendaftaran_tamu') # Default
+        else:
+            messages.error(request, "Username atau Password salah!")
+            
+    return render(request, 'tamu/login.html')
+
+def logout_view(request):
+    logout(request)
+    return redirect('login')
+
+
+def form_tamu(request):
+    if request.method == "POST":
+        # Ambil data dari form
+        nama_tamu = request.POST.get('nama')
+        nama_instansi = request.POST.get('instansi')
+        nama_pic = request.POST.get('pic_tuju') # Ini akan menerima string nama
+
+        # Cari objek PIC berdasarkan nama yang diketik
+        pic_obj = PIC.objects.filter(nama_lengkap=nama_pic, is_active=True).first()
+
+        # Simpan ke database
+        BukuTamu.objects.create(
+            nama=nama_tamu,
+            instansi=nama_instansi,
+            pic_tuju=pic_obj, # Django akan otomatis mengambil ID-nya
+            # ... tambahkan kolom lain sesuai modelmu ...
+        )
+        return redirect('halaman_sukses')
+
+    # Ambil semua data untuk rekomendasi (datalist)
+    daftar_pic = PIC.objects.filter(is_active=True)
+    daftar_instansi = Instansi.objects.all()
+
+    context = {
+        'daftar_pic': daftar_pic,
+        'daftar_instansi': daftar_instansi,
+    }
+    return render(request, 'tamu/form_tamu.html', context)
+
+
+@login_required(login_url='login')
+def arsip_tamu(request):
+    # 1. Ambil SEMUA data (urutkan dari yang terbaru)
+    tamu_list = BukuTamu.objects.all().order_by('-created_at')
+
+    # 2. Fitur Pencarian (Search) YANG AMAN
+    query = request.GET.get('q')
+    
+    if query:
+        # Cek apakah yang diketik user itu ANGKA? (Misal: "006" atau "6")
+        if query.isdigit():
+            # Jika angka, cari berdasarkan ID (ini pengganti pencarian nomor tiket)
+            # ATAU cari nomor HP juga boleh
+            tamu_list = tamu_list.filter(
+                Q(id=int(query)) | 
+                Q(no_hp__icontains=query)
+            )
+        else:
+            # Jika HURUF (Misal: "Budi" or "Unibraw"), cari Nama & Instansi
+            tamu_list = tamu_list.filter(
+                Q(nama__icontains=query) | 
+                Q(instansi__icontains=query)
+            )
+
+    # 3. Fitur Pagination (Bagi per 20 data per halaman)
+    paginator = Paginator(tamu_list, 20) 
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'tamu/arsip_tamu.html', {'page_obj': page_obj, 'query': query})
+# --- VIEW 1: Form Pendaftaran (Kode Anda) ---
+def pendaftaran_tamu(request):
+    if request.method == 'POST':
+        form = TamuForm(request.POST, request.FILES)
+        
+        if form.is_valid():
+            tamu = form.save(commit=False)
+            # (Baris daftar_instansi di sini sudah dihapus karena tidak berguna)
+            
+            # --- LOGIKA STATUS ---
+            if tamu.sudah_janji:
+                tamu.status = 'MASUK'
+                messages.success(request, f"Selamat Datang, {tamu.nama}! Silakan langsung masuk.")
+            else:
+                tamu.status = 'MENUNGGU'
+                messages.warning(request, f"Terima Kasih, {tamu.nama}. Mohon tunggu konfirmasi Security.")
+            
+            tamu.save()
+            return redirect('pendaftaran_tamu')
+    else:
+        form = TamuForm()
+
+    # ---> AMBIL DATA DARI DATABASE <---
+    daftar_pic = PIC.objects.filter(is_active=True)
+    daftar_instansi = Instansi.objects.all()
+
+    # ---> BUNGKUS KE DALAM CONTEXT <---
+    context = {
+        'form': form,
+        'daftar_pic': daftar_pic,
+        'daftar_instansi': daftar_instansi,
+    }
+
+    # ---> KIRIM CONTEXT KE HTML (INI YANG BENAR!) <---
+    return render(request, 'tamu/form_tamu.html', context)
+
+# --- VIEW 2: Dashboard Monitor (Kode Anda) ---
+@login_required(login_url='login')
+def daftar_tamu(request):
+    # 1. Siapkan Query Dasar (Semua Data, Diurutkan Prioritas & Waktu)
+    #    Kita TIDAK memfilter tanggal hari ini, supaya data lama (Feb 10) tetap muncul.
+    base_query = BukuTamu.objects.annotate(
+        urutan_prioritas=Case(
+            When(status='MENUNGGU', then=Value(1)), # Prioritas 1: Menunggu
+            When(status='MASUK', then=Value(2)),    # Prioritas 2: Sedang Bertamu
+            default=Value(3),                       # Prioritas 3: Selesai
+            output_field=IntegerField(),
+        )
+    ).order_by('urutan_prioritas', '-waktu_masuk')
+
+    # 2. Logika Filter Tombol (Jika diklik)
+    status_filter = request.GET.get('status')
+    
+    if status_filter == 'masuk':
+        tamu_list = base_query.filter(status='MASUK')
+    elif status_filter == 'keluar':
+        tamu_list = base_query.filter(status='KELUAR')
+    else:
+        # Jika tidak ada filter, tampilkan campuran
+        tamu_list = base_query
+
+    # 3. [PENTING] BATASI HANYA 50 DATA TERAKHIR
+    #    Ini yang membuat dashboard tetap ringan dan rapi.
+    #    Sisanya? Silakan cari di menu Arsip.
+    tamu_list = tamu_list[:50]
+
+    # 4. Hitung Statistik (Global Real-time)
+    #    Angka statistik tetap menghitung TOTAL SELURUHNYA di gedung,
+    #    tidak peduli apakah dia masuk di list 50 atau tidak.
+    stat_masuk = BukuTamu.objects.filter(status='MASUK').count()
+    stat_pulang = BukuTamu.objects.filter(status='KELUAR').count()
+    total_arsip = BukuTamu.objects.count()
+
+    context = {
+        'tamu_list': tamu_list,
+        'sedang_bertamu': stat_masuk,
+        'sudah_pulang': stat_pulang,
+        'total_arsip': total_arsip,
+    }
+    
+    return render(request, 'tamu/daftar_tamu.html', context)
+
+
+# --- VIEW 3: Ubah Status (Kode Anda) ---
+@login_required(login_url='login')
+def ubah_status(request, id, status_baru):
+    tamu = get_object_or_404(BukuTamu, id=id)
+    tamu.status = status_baru
+    
+    if status_baru == 'KELUAR':
+        tamu.waktu_keluar = timezone.now()
+    tamu.save()
+    
+    messages.success(request, f'Status {tamu.nama} diperbarui menjadi {status_baru}')
+    return redirect('daftar_tamu')
+
+
+# --- VIEW 4: DOWNLOAD EXCEL (MULTI-SHEET) ---
+def download_excel(request):
+    # 1. Ambil input tanggal
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    if not start_date or not end_date:
+        return render(request, 'tamu/laporan.html')
+
+    try:
+        start_dt = make_aware(datetime.strptime(f"{start_date} 00:00:00", "%Y-%m-%d %H:%M:%S"))
+        end_dt = make_aware(datetime.strptime(f"{end_date} 23:59:59", "%Y-%m-%d %H:%M:%S"))
+    except ValueError:
+        messages.error(request, "Format tanggal tidak valid.")
+        return redirect('arsip_tamu')
+
+
+    # 2. Siapkan Workbook Excel
+    wb = openpyxl.Workbook()
+    
+    # Hapus sheet default "Sheet" agar bersih, nanti kita buat baru
+    default_ws = wb.active
+    wb.remove(default_ws)
+
+    # 3. Definisi Kategori untuk 4 Sheet
+    # Format: ('value_di_db', 'Judul Sheet')
+    kategori_list = [
+        ('rekan_bisnis', 'LOKAL (BISNIS)'),
+        ('pemerintahan', 'PEMERINTAHAN'),
+        ('akademisi', 'AKADEMISI'),
+        ('overseas', 'LUAR NEGERI'),
+    ]
+
+    # Style Border
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                         top=Side(style='thin'), bottom=Side(style='thin'))
+
+    # 4. LOOPING MEMBUAT 4 SHEET
+    for db_value, sheet_title in kategori_list:
+        
+        # A. Buat Sheet Baru
+        ws = wb.create_sheet(title=sheet_title)
+
+        # B. Filter Data Spesifik per Kategori
+        data_tamu = BukuTamu.objects.filter(
+            created_at__date__range=[start_date, end_date],
+            kategori_tamu=db_value  # <--- Filter Kunci
+        ).order_by('created_at')
+
+        # C. Header Judul Besar
+        judul = f"LAPORAN TAMU KATEGORI {sheet_title} ({start_date} S/D {end_date})"
+        ws.merge_cells('A1:S1') 
+        ws['A1'] = judul
+        ws['A1'].font = Font(size=12, bold=True)
+        ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
+
+        # D. Header Kolom
+        headers = [
+            "NO", "NO. TIKET", "KATEGORI", "TANGGAL", "JAM MASUK", "JAM KELUAR",
+            "NAMA LENGKAP", "NO. TELFON", "INSTANSI", "NOPOL", "BERTEMU SIAPA", 
+            "JML ORG", "KEPERLUAN", "SUDAH JANJI?", "BARANG BAWAAN", "JML BARANG",
+        ]
+
+        for col_num, header_title in enumerate(headers, 1):
+            cell = ws.cell(row=2, column=col_num)
+            cell.value = header_title
+            cell.font = Font(bold=True, color="FFFFFF")
+            # Warna Biru Otsuka
+            cell.fill = openpyxl.styles.PatternFill(start_color="0056b3", end_color="0056b3", fill_type="solid") 
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = thin_border
+
+        # E. Isi Data (Jika kosong, loop ini tidak jalan, jadi tabel kosong)
+        row_num = 3
+        
+        for index, tamu in enumerate(data_tamu, 1):
+            # Ambil Label Kategori
+            kategori_label = tamu.get_kategori_tamu_display()
+            
+            # Format Waktu
+            waktu_masuk_wib = timezone.localtime(tamu.waktu_masuk) 
+            tanggal_saja = waktu_masuk_wib.strftime("%d-%m-%Y")
+            jam_masuk = waktu_masuk_wib.strftime("%H:%M")
+            jam_keluar = timezone.localtime(tamu.waktu_keluar).strftime("%H:%M") if tamu.waktu_keluar else "-"
+            
+            status_janji = "YA" if tamu.sudah_janji else "TIDAK"
+            nama_ktp = os.path.basename(tamu.foto_ktp.name) if tamu.foto_ktp else "-"
+            nama_selfie = os.path.basename(tamu.foto_wajah.name) if tamu.foto_wajah else "-"
+
+            row_data = [
+                index, tamu.nomor_tiket, kategori_label, tanggal_saja, jam_masuk, jam_keluar,
+                tamu.nama, tamu.no_hp, tamu.instansi, tamu.no_polisi, 
+                tamu.pic_tuju.nama_lengkap, tamu.jumlah_tamu, tamu.keperluan, 
+                status_janji, tamu.bawa_barang, tamu.jumlah_barang,
+            ]
+
+            for col_num, cell_value in enumerate(row_data, 1):
+                cell = ws.cell(row=row_num, column=col_num)
+                cell.value = cell_value
+                cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+                cell.border = thin_border
+            
+            row_num += 1
+
+        # F. Atur Lebar Kolom (Biar Rapi)
+        column_widths = [5, 18, 20, 15, 20, 20, 25, 15, 25, 15, 20, 8, 25, 20, 25, 20, 25, 25, 35]
+        for i, width in enumerate(column_widths, 1):
+            col_letter = openpyxl.utils.get_column_letter(i)
+            ws.column_dimensions[col_letter].width = width
+
+    # 5. Output File
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename=Laporan_Tamu_Otsuka_{start_date}.xlsx'
+    wb.save(response)
+    
+    return response
+
+def bersihkan_nama_instansi(teks_mentah):
+    if not teks_mentah:
+        return "LAIN-LAIN"
+    
+    # 1. Kecilkan huruf inputan tamu untuk dicocokkan
+    input_bersih = teks_mentah.lower().strip()
+    
+    # 2. Ambil SEMUA data instansi & kata kuncinya dari Database Admin
+    semua_instansi = Instansi.objects.all()
+    
+    for item in semua_instansi:
+        # Pecah kata kunci dari admin (contoh: "ub, brawijaya") menjadi list
+        list_keyword = [k.strip().lower() for k in item.kata_kunci.split(',')]
+        
+        # Cek apakah input tamu sama persis atau mengandung salah satu kata kunci
+        for keyword in list_keyword:
+            if keyword == input_bersih or keyword in input_bersih:
+                return item.nama_standar # Kembalikan nama paten dari database
+    
+    # 3. Jika Instansi BARU (Belum ada di Admin), kembalikan nama aslinya tapi dibesarkan hurufnya
+    return teks_mentah.upper().strip()
+  
+
+# --- VIEW 5: DASHBOARD ANALITIK (GRAFIK) ---
+@login_required(login_url='login') 
+def dashboard_analytics(request):
+    # Gunakan timezone bawaan Django agar tidak muncul warning Naive Datetime
+    from django.utils import timezone 
+    
+    # 1. Ambil tahun dari request (Default: tahun saat ini)
+    tahun_sekarang = timezone.now().year
+    tahun_dipilih = int(request.GET.get('tahun', tahun_sekarang))
+    
+    # 2. Ambil daftar tahun unik yang ada di database untuk menu Dropdown
+    daftar_tahun = BukuTamu.objects.dates('waktu_masuk', 'year', order='DESC')
+    list_tahun = [dt.year for dt in daftar_tahun]
+    
+    # Pastikan tahun sekarang masuk list jika database masih kosong
+    if tahun_sekarang not in list_tahun:
+        list_tahun.append(tahun_sekarang)
+
+    # ==========================================
+    # 3. DATA LINE CHART (TREN BULANAN)
+    # ==========================================
+    tamu_per_bulan = BukuTamu.objects.filter(waktu_masuk__year=tahun_dipilih)\
+        .annotate(bulan=ExtractMonth('waktu_masuk'))\
+        .values('bulan')\
+        .annotate(total=Count('id'))\
+        .order_by('bulan')
+    
+    data_bulan = [0] * 12 
+    for item in tamu_per_bulan:
+        data_bulan[item['bulan'] - 1] = item['total']
+
+    # ==========================================
+    # 4. DATA PIE CHART (KOMPOSISI KATEGORI)
+    # ==========================================
+    # Tambahkan filter tahun_dipilih agar Pie Chart ikut dinamis
+    tamu_per_kategori = BukuTamu.objects.filter(waktu_masuk__year=tahun_dipilih)\
+        .values('kategori_tamu')\
+        .annotate(total=Count('id'))\
+        .order_by('-total')
+        
+    labels_kategori = []
+    data_kategori = []
+    
+    for item in tamu_per_kategori:
+        # Ambil nama cantik dari KATEGORI_CHOICES di models.py
+        label_cantik = dict(BukuTamu.KATEGORI_CHOICES).get(item['kategori_tamu'], item['kategori_tamu'])
+        labels_kategori.append(label_cantik)
+        data_kategori.append(item['total'])
+
+    # ==========================================
+    # 5. DATA BAR CHART (TOP 5 INSTANSI TERPOPULER)
+    # ==========================================
+    # Tambahkan filter tahun_dipilih agar Bar Chart ikut dinamis
+    semua_instansi = BukuTamu.objects.filter(waktu_masuk__year=tahun_dipilih)\
+        .values_list('instansi', flat=True)
+    
+    # Bersihkan nama instansi pakai fungsi helper yang sudah Mas buat sebelumnya
+    instansi_bersih = [bersihkan_nama_instansi(nama) for nama in semua_instansi]
+    
+    # Hitung jumlahnya pakai Counter
+    hitungan_instansi = Counter(instansi_bersih)
+    
+    # Ambil 5 Terbanyak
+    top_5 = hitungan_instansi.most_common(5)
+    
+    labels_instansi = [item[0] for item in top_5]
+    data_instansi = [item[1] for item in top_5]
+
+    # ==========================================
+    # 6. KIRIM KE TEMPLATE HTML
+    # ==========================================
+    context = {
+        'data_bulan': json.dumps(data_bulan),
+        'labels_kategori': json.dumps(labels_kategori),
+        'data_kategori': json.dumps(data_kategori),
+        'labels_instansi': json.dumps(labels_instansi),
+        'data_instansi': json.dumps(data_instansi),
+        
+        # Variabel untuk Dropdown Filter
+        'tahun_aktif': tahun_dipilih, 
+        'list_tahun': list_tahun,      
+    }
+
+    return render(request, 'tamu/dashboard_analytics.html', context)

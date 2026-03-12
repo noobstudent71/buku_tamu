@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Tamu Otsuka</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card-custom { border: none; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .header-otsuka { background-color: #0056b3; color: white; padding: 20px; border-radius: 15px 15px 0 0; text-align: center; }
+        .rules-box { background-color: #ffeeba; border: 2px dashed #ffc107; border-radius: 10px; padding: 15px; margin-bottom: 20px; }
+        .rule-item { display: inline-block; margin: 10px; text-align: center; font-weight: bold; color: #d9534f; font-size: 0.9rem; }
+        .rule-icon { font-size: 2rem; display: block; }
+        .btn-simpan { background-color: #0d6efd; padding: 12px; font-size: 1.2rem; font-weight: bold; width: 100%; }
+        
+        /* STYLE CHECKBOX JANJI */
+        .btn-check:checked + .btn-outline-primary {
+            background-color: #0d6efd; color: white; box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3);
+        }
+        .btn-check:checked + .btn-outline-secondary {
+            background-color: #6c757d; color: white;
+        }
+
+        /* STYLE TOMBOL KAMERA */
+        .btn-kamera { cursor: pointer; transition: all 0.3s ease; border-style: dashed !important; background-color: #f8f9fa; }
+        .btn-kamera:hover { background-color: #e9ecef; transform: translateY(-2px); border-color: #0d6efd !important; }
+        .btn-kamera.sukses { background-color: #d1e7dd; border-color: #198754 !important; border-style: solid !important; }
+        
+        /* ANIMASI POPUP */
+        @keyframes popUp { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card card-custom">
+                
+                <!-- HEADER OTSUKA -->
+                <div class="header-otsuka">
+                    <h2 class="mb-0 fw-bold">FORM TAMU OTSUKA</h2>
+                    <small class="letter-spacing-1">GUEST PASS REGISTRATION</small>
+                </div>
+
+                <div class="card-body p-4">
+                    
+                    <!-- KOTAK PERATURAN -->
+                    <div class="rules-box text-center">
+                        <h5 class="text-dark mb-3 fw-bold">⚠️ PERATURAN TAMU / GUEST RULES</h5>
+                        <div class="rule-item"><span class="rule-icon">🚭</span>DILARANG<br>MEROKOK</div>
+                        <div class="rule-item"><span class="rule-icon">📵</span>DILARANG<br>MEMOTRET</div>
+                        <div class="rule-item"><span class="rule-icon">🚮</span>BUANG SAMPAH<br>PADA TEMPATNYA</div>
+                        <div class="rule-item"><span class="rule-icon">🚫</span>DILARANG MASUK<br>TANPA IJIN</div>
+                        <div class="rule-item"><span class="rule-icon">⛑️</span>UTAMAKAN<br>KESELAMATAN</div>
+                    </div>
+
+                    <!-- FORM MULAI -->
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nama Lengkap / Guest Name</label>
+                            {{ form.nama }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Kategori Tamu / Category</label>
+                            <select name="kategori_tamu" class="form-select" required>
+                                <option value="" selected disabled>-- Pilih Kategori --</option>
+                                <option value="rekan_bisnis">Lokal Rekan Bisnis</option>
+                                <option value="pemerintahan">Pemerintahan</option>
+                                <option value="akademisi">Akademisi</option>
+                                <option value="overseas">Overseas Guests (Luar Negeri)</option>
+                            </select>
+                        </div>
+
+                        <!-- BARIS: NO HP & INSTANSI (Diperbaiki col-12) -->
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">No. HP / Phone</label>
+                                {{ form.no_hp }}
+                                <div class="form-text opacity-75 small">Pastikan nomor aktif (bisa dihubungi).</div>
+                            </div>
+                            
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">Asal Instansi/Perusahaan:</label>
+                                {{ form.instansi }}
+
+                                <datalist id="list_instansi">
+                                </datalist>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">No. Polisi/License Plate</label>
+                            {{ form.no_polisi }}
+                        </div>
+
+                        <hr class="my-4 text-muted">
+
+                        <!-- BARIS: PIC & JUMLAH ORANG -->
+                        <div class="row mb-3">
+                            <div class="col-md-8 mb-3 mb-md-0">
+                                <label class="form-label fw-bold">Ingin Bertemu Siapa? / Meet With</label>
+                                <input type="text" id="input_pencarian_pic" list="daftar_pic" class="form-control" placeholder="🔍 Ketik nama PIC..." required autocomplete="off">
+                                
+                                <datalist id="daftar_pic">
+                                    {% for p in daftar_pic %}
+                                        <option value="{{ p.nama_lengkap }}"></option>
+                                    {% endfor %}
+                                </datalist>
+                                
+                                <!-- Field asli disembunyikan -->
+                                <div class="d-none">
+                                    {{ form.pic_tuju }}
+                                </div>
+                                <small class="text-muted fst-italic mt-1 d-block">*Ketik nama, lalu pilih dari rekomendasi yang muncul</small>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Jml. Orang / Total Pax</label>
+                                {{ form.jumlah_tamu }}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Keperluan / Purpose</label>
+                            {{ form.keperluan }}
+                        </div>
+
+                        <!-- STATUS JANJI TEMU -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold d-block">Status Janji Temu</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="sudah_janji" id="janji_ya" value="True">
+                                <label class="btn btn-outline-primary py-2" for="janji_ya">
+                                    <span class="fw-bold d-block fs-5">✅ Sudah Janji</span>
+                                    <span class="small fst-italic opacity-75">With Appointment</span>
+                                </label>
+
+                                <input type="radio" class="btn-check" name="sudah_janji" id="janji_tidak" value="False" checked>
+                                <label class="btn btn-outline-secondary py-2" for="janji_tidak">
+                                    <span class="fw-bold d-block fs-5">❌ Belum Janji</span>
+                                    <span class="small fst-italic opacity-75">Walk-In / No Appointment</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- BARANG BAWAAN -->
+                        <div class="alert alert-warning p-3 mb-4 rounded-3 border-warning">
+                            <label class="fw-bold text-dark mb-2 d-block">📦 Barang Bawaan / Belongings</label>
+                            
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <div class="flex-grow-1">
+                                    <input type="text" name="bawa_barang" id="input_nama_barang" class="form-control" placeholder="Tulis barang yang dibawa (Laptop/Tas/Alat)...">
+                                </div>
+
+                                <div style="width: 140px;">
+                                    <div class="input-group">
+                                        <span class="input-group-text fw-bold px-2">Total</span>
+                                        <input type="number" name="jumlah_barang" id="input_jml_barang" class="form-control text-center fw-bold" value="0" min="0">
+                                    </div>
+                                </div>
+                            </div>
+                            <small class="text-muted fst-italic mt-2 d-block">*Kosongkan jika tidak membawa barang</small>
+                        </div>
+
+                        <hr class="my-4 text-muted">
+
+                        <!-- BARIS: KAMERA KTP & SELFIE -->
+                        <div class="row mb-4">
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label class="form-label fw-bold">📸 Foto KTP / Identity Card</label>
+                                <div class="d-none">{{ form.foto_ktp }}</div>
+                                <label for="id_foto_ktp" class="btn-kamera w-100 py-4 border border-2 border-secondary rounded-3 text-center shadow-sm" id="box-ktp">
+                                    <div class="h1 mb-2">📷</div> 
+                                    <h5 class="fw-bold m-0" id="judul-ktp">Buka Kamera KTP</h5>
+                                    <small class="text-muted" id="status-ktp">Ketuk untuk mengambil foto</small>
+                                </label>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">🤳 Foto Wajah / Selfie</label>
+                                <div class="d-none">{{ form.foto_wajah }}</div>
+                                <label for="id_foto_wajah" class="btn-kamera w-100 py-4 border border-2 border-secondary rounded-3 text-center shadow-sm" id="box-wajah">
+                                    <div class="h1 mb-2">🤳</div> 
+                                    <h5 class="fw-bold m-0" id="judul-wajah">Buka Kamera Selfie</h5>
+                                    <small class="text-muted" id="status-wajah">Wajib tanpa masker</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- TOMBOL SIMPAN -->
+                        <button type="submit" class="btn btn-primary btn-simpan shadow rounded-pill mt-2">
+                            💾 SIMPAN DATA / CHECK IN
+                        </button>
+
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        
+        // A. LOGIKA TOMBOL KAMERA
+        function handleFileSelect(inputId, boxId, judulId, statusId) {
+            const inputEl = document.getElementById(inputId);
+            const box = document.getElementById(boxId);
+            const judul = document.getElementById(judulId);
+            const statusTxt = document.getElementById(statusId);
+
+            if(inputEl) {
+                inputEl.addEventListener('change', function() {
+                    if (this.files && this.files[0]) {
+                        box.classList.add('sukses');
+                        box.classList.remove('border-secondary');
+                        judul.innerText = "✅ Foto Tersimpan!";
+                        statusTxt.innerText = this.files[0].name;
+                        statusTxt.classList.remove('text-muted');
+                        statusTxt.classList.add('text-success', 'fw-bold');
+                    }
+                });
+            }
+        }
+        handleFileSelect('id_foto_ktp', 'box-ktp', 'judul-ktp', 'status-ktp');
+        handleFileSelect('id_foto_wajah', 'box-wajah', 'judul-wajah', 'status-wajah');
+
+        // B. LOGIKA BARANG BAWAAN
+        const inputNama = document.getElementById('input_nama_barang');
+        const inputJml = document.getElementById('input_jml_barang');
+
+        if(inputNama && inputJml){
+            inputNama.addEventListener('input', function() {
+                if (this.value.trim().length > 0) {
+                    if (inputJml.value == 0 || inputJml.value == '') inputJml.value = 1;
+                } else {
+                    inputJml.value = 0;
+                }
+            });
+        }
+        // --- C. LOGIKA SEARCH PIC (AUTOCOMPLETE) ---
+        const selectPicAsli = document.getElementById('id_pic_tuju'); // Ini ID bawaan Django
+        const inputSearchPic = document.getElementById('input_pencarian_pic');
+        const dataListPic = document.getElementById('daftar_pic');
+
+        if (selectPicAsli && inputSearchPic && dataListPic) {
+            // 1. Pindahkan nama dari Dropdown tersembunyi ke Datalist (Rekomendasi)
+            Array.from(selectPicAsli.options).forEach(opt => {
+                if (opt.value) { // Abaikan pilihan kosong (---------)
+                    let option = document.createElement('option');
+                    option.value = opt.text; // Yang direkomendasikan adalah NAMA
+                    option.setAttribute('data-id', opt.value); // Simpan ID-nya diam-diam
+                    dataListPic.appendChild(option);
+                }
+            });
+
+            // 2. Saat user mengetik dan mengklik rekomendasi
+            inputSearchPic.addEventListener('input', function() {
+                let selectedName = this.value;
+                let foundId = "";
+
+                // Cari apakah nama yang diketik cocok dengan data di sistem
+                Array.from(dataListPic.options).forEach(opt => {
+                    if (opt.value === selectedName) {
+                        foundId = opt.getAttribute('data-id');
+                    }
+                });
+
+                // ==========================================
+                // 🔥 FITUR BARU: AUTO-HAPUS KATA SAPAAN
+                // ==========================================
+                let teksMentah = this.value;
+                // Regex: Mendeteksi kata Pak/Bapak/Bu/Ibu/Mas/Mbak di AWAL teks yang diikuti spasi
+                let teksBersih = teksMentah.replace(/^(pak |bapak |bu |ibu |mas |mbak |kang |teh )/i, '');
+                
+                // Jika teks berubah (artinya ada kata sapaan yang terdeteksi)
+                if (teksMentah !== teksBersih) {
+                    this.value = teksBersih; // Ganti isi kotak input jadi bersih
+                }
+                // ==========================================
+
+                // Jika cocok, masukkan ID-nya ke dropdown Django untuk disave ke Database
+                if (foundId) {
+                    selectPicAsli.value = foundId;
+                } else {
+                    selectPicAsli.value = ""; // Kosongkan jika ngetik ngawur (agar form ditolak)
+                }
+            });
+        }
+        // --- D. LOGIKA AJAX PENCARIAN INSTANSI ---
+        const inputInstansi = document.getElementById('id_instansi'); 
+        const dataListInstansi = document.getElementById('list_instansi');
+
+        if (inputInstansi && dataListInstansi) {
+            inputInstansi.setAttribute('list', 'list_instansi');
+            inputInstansi.setAttribute('autocomplete', 'off'); 
+
+            let timerInstansi; 
+
+            inputInstansi.addEventListener('input', function() {
+                const query = this.value;
+
+                clearTimeout(timerInstansi); 
+
+                if (query.length === 0) {
+                    dataListInstansi.innerHTML = '';
+                    return;
+                }
+
+                timerInstansi = setTimeout(() => {
+                    fetch(`/api/search-perusahaan/?q=${query}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            dataListInstansi.innerHTML = ''; 
+                            
+                            data.forEach(item => {
+                                const option = document.createElement('option');
+                                option.value = item;
+                                dataListInstansi.appendChild(option);
+                            });
+                        })
+                        .catch(error => console.error('Gagal mengambil data Instansi:', error));
+                }, 300);
+            });
+        }
+    });
+</script>
+
+{% if messages %}
+<div id="overlay-sukses" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+    
+    <div class="card p-4 text-center shadow-lg border-0" style="max-width: 400px; width: 90%; border-radius: 20px; animation: popUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+        
+        <div style="font-size: 4rem;">✅</div>
+        <h2 class="fw-bold mt-2 text-success">BERHASIL!</h2>
+        
+        <div class="my-3">
+            {% for message in messages %}
+                <div class="alert alert-light border border-success text-dark fw-bold mb-2 shadow-sm">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+
+        <p class="text-muted small mb-0">
+            Halaman akan dimuat ulang dalam <b id="countdown" class="text-primary fs-5">4</b> detik...
+        </p>
+    </div>
+
+</div>
+
+<script>
+    // LOGIKA COUNTDOWN YANG BENAR (4..3..2..1)
+    let seconds = 4;
+    const countSpan = document.getElementById('countdown');
+    
+    const interval = setInterval(() => {
+        seconds--;
+        if (countSpan) countSpan.innerText = seconds;
+        
+        if (seconds <= 0) {
+            clearInterval(interval);
+            // Redirect ke halaman pendaftaran (membersihkan form)
+            window.location.href = "{% url 'pendaftaran_tamu' %}";
+        }
+    }, 1000); // Jalan setiap 1000ms (1 detik)
+</script>
+{% endif %}
+
+</body>
+</html>

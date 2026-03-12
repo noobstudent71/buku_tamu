@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistem Buku Tamu Otsuka</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0056b3 0%, #00a1ff 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .brand-logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #0056b3;
+            margin-bottom: 5px;
+        }
+        .brand-sub {
+            font-size: 0.9rem;
+            color: #6c757d;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+        }
+        .form-control {
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+        }
+        .btn-login {
+            background: #0056b3;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            width: 100%;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: 0.3s;
+        }
+        .btn-login:hover {
+            background: #004494;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <div class="brand-logo">OTSUKA</div>
+    <div class="brand-sub">Guest Management System</div>
+
+    {% if messages %}
+        {% for message in messages %}
+        {% if message.tags == 'error' %}
+            <div class="alert alert-danger text-center fw-bold shadow-sm rounded-3 py-2 mb-3">{{ message }}</div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    <form method="POST">
+        {% csrf_token %}
+        <input type="text" name="username" class="form-control" placeholder="Username" required>
+        <input type="password" name="password" class="form-control" placeholder="Password" required>
+        
+        <button type="submit" class="btn btn-primary btn-login">MASUK / LOGIN</button>
+    </form>
+    
+    <div class="mt-4 small text-muted">
+        &copy;  PT Otsuka Indonesia
+    </div>
+</div>
+
+</body>
+</html>
