@@ -8,7 +8,6 @@ import os
 from datetime import datetime
 from django.utils import timezone 
 from django.db import models
-from .models import Instansi
 from django.http import JsonResponse
 
 def search_perusahaan(request):

@@ -1,251 +1,141 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Analitik Tamu</title>
-    
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    
-    <style>
-        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card-chart { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); transition: transform 0.3s; }
-        .card-chart:hover { transform: translateY(-5px); }
-        .header-bg { background: linear-gradient(135deg, #0056b3 0%, #004494 100%); color: white; padding: 30px 20px; border-radius: 0 0 20px 20px; margin-bottom: 30px; }
-        .chart-container { position: relative; height: 300px; width: 100%; }
-    </style>
-</head>
-<body>
+{% extends 'tamu/base.html' %}
 
-    <div class="header-bg shadow py-3 mb-4">
-    <div class="container d-flex justify-content-between align-items-center flex-wrap gap-3">
+{% block title %}Dashboard Analitik - Buku Tamu Otsuka{% endblock %}
 
-        <div>
-            <h2 class="fw-bold mb-0 text-white">
-                <i class="fas fa-chart-line me-2"></i>Dashboard Analitik
-            </h2>
-            <p class="mb-0 text-white opacity-75">
-                Statistik & Evaluasi Data Tamu Tahun {{ tahun_aktif }}
-            </p> 
-        </div>
+{% block page_header %}
+    <i class="fas fa-chart-line text-primary me-2"></i> Dashboard Analitik
+{% endblock %}
 
-        <div class="d-flex align-items-center flex-wrap gap-3">
-            
-            <!-- 1. Grup Tombol Menu/Aksi -->
-            <div class="d-flex align-items-center gap-2 pe-3 border-end border-light border-opacity-50">
-                <button type="button" class="btn btn-success fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDownload">
-                    <i class="fas fa-file-excel me-1"></i> Export Excel
-                </button>
+{% block topbar_extra %}
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-success fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDownload">
+            <i class="fas fa-file-excel me-1"></i> Export Excel
+        </button>
+        <button onclick="window.print()" class="btn btn-outline-secondary shadow-sm">
+            <i class="fas fa-print me-1"></i> Print
+        </button>
+    </div>
+{% endblock %}
 
-                <button onclick="window.print()" class="btn btn-outline-light shadow-sm">
-                    <i class="fas fa-print me-1"></i> Print
-                </button>
-                
+{% block extra_css %}
+<style>
+    .card-chart { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); transition: transform 0.3s; }
+    .card-chart:hover { transform: translateY(-5px); }
+    .chart-container { position: relative; height: 300px; width: 100%; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-end mb-3">
+    <form method="GET" class="d-flex align-items-center gap-2 bg-white px-3 py-2 rounded shadow-sm">
+        <label class="small fw-bold text-muted mb-0"><i class="fas fa-filter me-1"></i> FILTER TAHUN:</label>
+        <select name="tahun" class="form-select form-select-sm fw-bold border-primary text-primary" onchange="this.form.submit()" style="width: 120px; cursor: pointer;">
+            {% for thn in list_tahun %}
+                <option value="{{ thn }}" {% if thn == tahun_aktif %}selected{% endif %}>{{ thn }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<div class="row mb-4">
+    <div class="col-lg-8 mb-4 mb-lg-0">
+        <div class="card card-chart h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="fw-bold m-0 text-primary"><i class="fas fa-building me-2"></i>Top Instansi Terpopuler ({{ tahun_aktif }})</h5>
             </div>
-
-            <!-- 2. Grup User HRD & Tombol Logout -->
-            <div class="d-flex align-items-center gap-2">
-                <span class="text-light fw-bold text-uppercase me-2">
-                    <i class="fas fa-user-tie me-1"></i> {{ request.user.username }}
-                </span>
-                
-                <a href="{% url 'logout' %}" class="btn btn-danger btn-sm fw-bold shadow border border-light border-opacity-25">
-                    <i class="fas fa-sign-out-alt me-1"></i> LOGOUT
-                </a>
+            <div class="card-body">
+                <div class="chart-container"><canvas id="barInstansi"></canvas></div>
             </div>
-
         </div>
-        
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card card-chart h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="fw-bold m-0 text-primary"><i class="fas fa-users me-2"></i>Komposisi Tamu ({{ tahun_aktif }})</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" style="height: 250px;"><canvas id="pieKategori"></canvas></div>
+            </div>
+        </div>
     </div>
 </div>
 
-    <div class="container pb-5">
-        
-        <div class="row mb-4">
-            <div class="col-lg-8 mb-4">
-                <div class="card card-chart h-100">
-                    <div class="card-header bg-white border-0 py-3">
-                        <h5 class="fw-bold m-0 text-primary"><i class="fas fa-building me-2"></i>Top Instansi Terpopuler</h5>
-                        <small class="text-muted">Instansi dengan jumlah kunjungan terbanyak (Sudah dinormalisasi)</small>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="barInstansi"></canvas>
-                        </div>
-                    </div>
-                </div>
+<div class="row">
+    <div class="col-12">
+        <div class="card card-chart">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="fw-bold m-0 text-primary"><i class="fas fa-calendar-alt me-2"></i>Tren Kunjungan Bulanan ({{ tahun_aktif }})</h5>
             </div>
-
-            <div class="col-lg-4 mb-4">
-                <div class="card card-chart h-100">
-                    <div class="card-header bg-white border-0 py-3">
-                        <h5 class="fw-bold m-0 text-primary"><i class="fas fa-users me-2"></i>Komposisi Tamu</h5>
-                        <small class="text-muted">Persentase berdasarkan kategori</small>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container" style="height: 250px;">
-                            <canvas id="pieKategori"></canvas>
-                        </div>
-                        <div class="text-center mt-3 text-muted small">
-                            *Data dihitung dari total tamu masuk tahun {{ tahun_aktif }}
-                        </div>
-                    </div>
-                </div>
+            <div class="card-body">
+                <div class="chart-container" style="height: 350px;"><canvas id="lineBulan"></canvas></div>
             </div>
         </div>
-
-        <div class="row">
-            <div class="col-12">
-                <div class="card card-chart">
-                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="fw-bold m-0 text-primary"><i class="fas fa-calendar-alt me-2"></i>Tren Kunjungan Bulanan</h5>
-                            <small class="text-muted">Grafik naik turun jumlah tamu sepanjang tahun {{ tahun_aktif }}</small>
-                        </div>
-                        
-                        <form method="GET" class="d-flex align-items-center gap-2 m-0">
-                            <label class="small fw-bold text-muted mb-0">FILTER TAHUN:</label>
-                            <select name="tahun" class="form-select form-select-sm fw-bold border-success text-success" 
-                                    onchange="this.form.submit()" style="width: 100px; cursor: pointer;">
-                                {% for thn in list_tahun %}
-                                    <option value="{{ thn }}" {% if thn == tahun_aktif %}selected{% endif %}>
-                                        {{ thn }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </form>
-                        </div>
-                    <div class="card-body">
-                        <div class="chart-container" style="height: 350px;">
-                            <canvas id="lineBulan"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
     </div>
+</div>
 
-    <div class="modal fade" id="modalDownload" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg">
-                <form action="{% url 'laporan_excel' %}" method="GET"> 
-                    <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title fw-bold"><i class="fas fa-file-excel me-2"></i>Download Laporan Excel</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-4">
-                        <p class="text-muted mb-4">Pilih rentang tanggal untuk mengunduh laporan Excel (4 Sheet).</p>
-                        
-                        <div class="mb-3">
-                            <label class="fw-bold form-label">Dari Tanggal</label>
-                            <input type="date" name="start_date" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="fw-bold form-label">Sampai Tanggal</label>
-                            <input type="date" name="end_date" class="form-control" required>
-                        </div>
-                    </div>
-                    <div class="modal-footer bg-light">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" class="btn btn-success fw-bold">
-                            <i class="fas fa-download me-1"></i> Download Sekarang
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>{% include 'tamu/modal_excel.html' %}
+{% include 'tamu/modal_excel.html' %}
+{% endblock %}
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const dataBulan = {{ data_bulan|safe }};
+    const labelsKategori = {{ labels_kategori|safe }};
+    const dataKategori = {{ data_kategori|safe }};
+    const labelsInstansi = {{ labels_instansi|safe }};
+    const dataInstansi = {{ data_instansi|safe }};
 
-    <script>
-        // --- AMBIL DATA DARI DJANGO (Backend) ---
-        const dataBulan = {{ data_bulan|safe }};
-        const labelsKategori = {{ labels_kategori|safe }};
-        const dataKategori = {{ data_kategori|safe }};
-        const labelsInstansi = {{ labels_instansi|safe }};
-        const dataInstansi = {{ data_instansi|safe }};
+    Chart.defaults.font.family = "'Segoe UI', 'Helvetica', 'Arial', sans-serif";
+    Chart.defaults.color = '#666';
 
-        // --- KONFIGURASI CHART (SAMA SEPERTI SEBELUMNYA) ---
-        Chart.defaults.font.family = "'Segoe UI', 'Helvetica', 'Arial', sans-serif";
-        Chart.defaults.color = '#666';
+    // 1. GRAFIK TOP INSTANSI
+    new Chart(document.getElementById('barInstansi').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: labelsInstansi,
+            datasets: [{
+                label: 'Jumlah Kunjungan',
+                data: dataInstansi,
+                backgroundColor: ['rgba(54, 162, 235, 0.7)', 'rgba(255, 99, 132, 0.7)', 'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)'],
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1, borderRadius: 5
+            }]
+        },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+    });
 
-        // 1. GRAFIK TOP INSTANSI
-        new Chart(document.getElementById('barInstansi').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: labelsInstansi,
-                datasets: [{
-                    label: 'Jumlah Kunjungan',
-                    data: dataInstansi,
-                    backgroundColor: ['rgba(54, 162, 235, 0.7)', 'rgba(255, 99, 132, 0.7)', 'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(201, 203, 207, 0.7)'],
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1,
-                    borderRadius: 5
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } // precision 0 supaya ngga koma-koma
-            }
-        });
+    // 2. GRAFIK KATEGORI
+    new Chart(document.getElementById('pieKategori').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: labelsKategori,
+            datasets: [{
+                data: dataKategori,
+                backgroundColor: ['#0056b3', '#28a745', '#ffc107', '#dc3545'], hoverOffset: 4
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
 
-        // 2. GRAFIK KATEGORI
-        new Chart(document.getElementById('pieKategori').getContext('2d'), {
-            type: 'doughnut',
-            data: {
-                labels: labelsKategori,
-                datasets: [{
-                    data: dataKategori,
-                    backgroundColor: ['#0056b3', '#28a745', '#ffc107', '#dc3545'],
-                    hoverOffset: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } }
-            }
-        });
+    // 3. GRAFIK TREN BULANAN
+    const ctxLine = document.getElementById('lineBulan').getContext('2d');
+    let gradient = ctxLine.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(0, 86, 179, 0.5)'); gradient.addColorStop(1, 'rgba(0, 86, 179, 0.0)');
 
-        // 3. GRAFIK TREN BULANAN
-        const ctxLine = document.getElementById('lineBulan').getContext('2d');
-        let gradient = ctxLine.createLinearGradient(0, 0, 0, 400);
-        gradient.addColorStop(0, 'rgba(0, 86, 179, 0.5)');
-        gradient.addColorStop(1, 'rgba(0, 86, 179, 0.0)');
-
-        new Chart(ctxLine, {
-            type: 'line',
-            data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
-                datasets: [{
-                    label: 'Total Tamu',
-                    data: dataBulan,
-                    borderColor: '#0056b3',
-                    backgroundColor: gradient,
-                    tension: 0.4,
-                    fill: true,
-                    pointRadius: 5,
-                    pointHoverRadius: 8
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { borderDash: [2, 4] }, ticks: { precision: 0 } },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
-    </script>
-
-</body>
-</html>
+    new Chart(ctxLine, {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
+            datasets: [{
+                label: 'Total Tamu', data: dataBulan, borderColor: '#0056b3', backgroundColor: gradient,
+                tension: 0.4, fill: true, pointRadius: 5, pointHoverRadius: 8
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, grid: { borderDash: [2, 4] }, ticks: { precision: 0 } }, x: { grid: { display: false } } }
+        }
+    });
+</script>
+{% endblock %}

@@ -23,4 +23,10 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     
     path('api/search-perusahaan/', views.search_perusahaan, name='search-perusahaan'),
+    
+    path('master-data/', views.master_data, name='master_data'),
+
+    path('master-data/hapus/<str:tipe>/<int:id>/', views.hapus_data, name='hapus_data'),
+    
+    path('master-data/toggle/<str:tipe>/<int:id>/', views.toggle_status, name='toggle_status'),
 ]

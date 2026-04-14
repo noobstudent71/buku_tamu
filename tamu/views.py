@@ -21,6 +21,7 @@ from .models import PIC, Instansi, BukuTamu
 from django.contrib.auth import logout
 from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
+from django.contrib.auth.models import User, Group
 
 def search_perusahaan(request):
     # Tangkap huruf yang sedang diketik user (misal: "Otsu")
@@ -30,7 +31,7 @@ def search_perusahaan(request):
         # Cari di database: Perusahaan yang mengandung kata (icontains) dari query
         # values_list flat=True: Ambil namanya saja, distinct(): Jangan ada nama dobel
         # [:10] = Batasi maksimal 10 saran agar server tidak berat
-        hasil = BukuTamu.objects.filter(perusahaan__icontains=query).values_list('perusahaan', flat=True).distinct()[:10]
+        hasil = Instansi.objects.filter(nama_standar__icontains=query).values_list('nama_standar', flat=True).distinct()[:10]
         data = list(hasil)
     else:
         data = []
@@ -447,3 +448,103 @@ def dashboard_analytics(request):
     }
 
     return render(request, 'tamu/dashboard_analytics.html', context)
+
+@login_required(login_url='login')
+def master_data(request):
+    if request.method == 'POST':
+        tipe_data = request.POST.get('tipe_data')
+        
+        # --- LOGIKA TAMBAH AKUN (USER) ---
+        if tipe_data == 'akun':
+            username = request.POST.get('username')
+            password = request.POST.get('password')
+            role = request.POST.get('role') # SATPAM atau KANTOR
+            
+            if username and password:
+                # 1. Cek apakah username sudah ada
+                if User.objects.filter(username=username).exists():
+                    messages.error(request, f"Username '{username}' sudah terdaftar!")
+                else:
+                    # 2. Buat User baru (Password akan di-hash/enkripsi otomatis)
+                    user_baru = User.objects.create_user(username=username, password=password)
+                    
+                    # 3. Masukkan ke Grup sesuai Role
+                    group, created = Group.objects.get_or_create(name=role)
+                    user_baru.groups.add(group)
+                    
+                    messages.success(request, f"Akun {role} '{username}' berhasil dibuat!")
+
+        # --- LOGIKA TAMBAH INSTANSI ---
+        elif tipe_data == 'instansi':
+            nama_baru = request.POST.get('nama_standar')
+            kata_kunci = request.POST.get('kata_kunci', '')
+            if nama_baru:
+                Instansi.objects.create(nama_standar=nama_baru, kata_kunci=kata_kunci)
+                messages.success(request, f"Instansi '{nama_baru}' berhasil ditambahkan!")
+                
+        # --- LOGIKA TAMBAH PIC ---
+        elif tipe_data == 'pic':
+            nama_baru = request.POST.get('nama_lengkap')
+            if nama_baru:
+                PIC.objects.create(nama_lengkap=nama_baru, is_active=True)
+                messages.success(request, f"PIC '{nama_baru}' berhasil ditambahkan!")
+                
+        return redirect('master_data')
+
+    # Data untuk tabel
+    daftar_instansi = Instansi.objects.all().order_by('nama_standar')
+    daftar_pic = PIC.objects.all().order_by('nama_lengkap')
+    daftar_user = User.objects.all().order_by('-date_joined') # Ambil semua akun
+
+    context = {
+        'daftar_instansi': daftar_instansi,
+        'daftar_pic': daftar_pic,
+        'daftar_user': daftar_user,
+    }
+    return render(request, 'tamu/master_data.html', context)
+
+# --- VIEW 7: HAPUS DATA MASTER ---
+@login_required(login_url='login')
+def hapus_data(request, tipe, id):
+    if tipe == 'instansi':
+        obj = get_object_or_404(Instansi, id=id)
+        nama = obj.nama_standar
+        obj.delete()
+    elif tipe == 'pic':
+        obj = get_object_or_404(PIC, id=id)
+        nama = obj.nama_lengkap
+        obj.delete()
+    elif tipe == 'akun':
+        obj = get_object_or_404(User, id=id)
+        nama = obj.username
+        # Jangan izinkan menghapus akun admin utama
+        if obj.is_superuser:
+            messages.error(request, "Akun Super Admin tidak boleh dihapus!")
+            return redirect('master_data')
+        obj.delete()
+        
+    messages.success(request, f"Data '{nama}' berhasil dihapus secara permanen.")
+    return redirect('master_data')
+
+# --- VIEW 8: UBAH STATUS AKTIF/NONAKTIF ---
+@login_required(login_url='login')
+def toggle_status(request, tipe, id):
+    if tipe == 'pic':
+        obj = get_object_or_404(PIC, id=id)
+        obj.is_active = not obj.is_active # Balikkan statusnya
+        obj.save()
+        status_str = "Diaktifkan" if obj.is_active else "Dinonaktifkan"
+        messages.success(request, f"Status PIC '{obj.nama_lengkap}' berhasil {status_str}.")
+        
+    elif tipe == 'akun':
+        obj = get_object_or_404(User, id=id)
+        if obj.is_superuser:
+            messages.error(request, "Status Super Admin tidak boleh diubah!")
+            return redirect('master_data')
+            
+        obj.is_active = not obj.is_active # Balikkan statusnya
+        obj.save()
+        status_str = "Diaktifkan" if obj.is_active else "Dinonaktifkan"
+        messages.success(request, f"Akun '{obj.username}' berhasil {status_str}.")
+        
+    return redirect('master_data')
