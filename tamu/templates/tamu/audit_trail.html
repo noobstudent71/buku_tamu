@@ -1,0 +1,88 @@
+{% extends 'tamu/base.html' %}
+{% block title %}Audit Log Aktivitas{% endblock %}
+
+{% block page_header %}Audit Log Aktivitas{% endblock %}
+{% block topbar_extra %}<span class="text-muted small">Pantau aktivitas admin dan perubahan data</span>{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm bg-white rounded-3 p-4">
+    
+    <form method="GET" id="filterForm">
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <label class="small text-muted fw-bold mb-1">User (Username)</label>
+                <input type="text" name="user" class="form-control text-muted" placeholder="Masukkan Username" value="{{ cari_user }}">
+            </div>
+            <div class="col-md-4">
+                <label class="small text-muted fw-bold mb-1">Action</label>
+                <select name="aksi" class="form-select text-muted">
+                    <option value="Semua">Semua</option>
+                    <option value="LOGIN" {% if cari_aksi == 'LOGIN' %}selected{% endif %}>LOGIN</option>
+                    <option value="LOGOUT" {% if cari_aksi == 'LOGOUT' %}selected{% endif %}>LOGOUT</option>
+                    <option value="TAMBAH" {% if cari_aksi == 'TAMBAH' %}selected{% endif %}>TAMBAH</option>
+                    <option value="HAPUS" {% if cari_aksi == 'HAPUS' %}selected{% endif %}>HAPUS</option>
+                    <option value="EXPORT" {% if cari_aksi == 'EXPORT' %}selected{% endif %}>EXPORT</option>
+                    <option value="UBAH STATUS" {% if cari_aksi == 'UBAH STATUS' %}selected{% endif %}>UBAH STATUS</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="small text-muted fw-bold mb-1">Cari Tanggal</label>
+                <input type="date" name="tanggal" class="form-control text-muted" value="{{ cari_tanggal }}">
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="small text-muted">Menampilkan halaman {{ page_obj.number }}</span>
+            <div class="d-flex gap-2 align-items-center">
+                <button type="submit" class="btn btn-sm btn-primary px-3">Terapkan Filter</button>
+                <a href="{% url 'audit_trail' %}" class="small text-decoration-none ms-2 text-muted">Reset filter</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-borderless align-middle" style="font-size: 0.85rem;">
+            <thead class="border-bottom text-muted">
+                <tr>
+                    <th class="py-2">Waktu</th>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Action</th>
+                    <th>Target / Resource</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in page_obj %}
+                <tr class="border-bottom">
+                    <td class="text-muted">{{ log.waktu|date:"d/m/Y, H:i:s" }} WIB</td>
+                    <td class="text-muted fw-bold text-primary">{{ log.user.username }}</td>
+                    <td class="text-muted">
+                        {% if log.user.is_superuser %}ADMIN{% elif log.user.groups.all %}{{ log.user.groups.first.name }}{% else %}UNKNOWN{% endif %}
+                    </td>
+                    <td>
+                        <span class="text-primary fw-bold">{{ log.aksi }}</span>
+                    </td>
+                    <td class="text-muted">{{ log.target }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center py-4 text-muted">Data log tidak ditemukan.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="d-flex justify-content-center mt-3">
+        <div class="btn-group">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}&user={{ cari_user }}&aksi={{ cari_aksi }}&tanggal={{ cari_tanggal }}" class="btn btn-sm btn-light border text-muted"><i class="fas fa-chevron-left"></i> Sebelumnya</a>
+            {% endif %}
+            
+            <span class="btn btn-sm btn-light border disabled text-muted">Halaman {{ page_obj.number }}</span>
+            
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}&user={{ cari_user }}&aksi={{ cari_aksi }}&tanggal={{ cari_tanggal }}" class="btn btn-sm btn-light border text-muted">Berikutnya <i class="fas fa-chevron-right"></i></a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

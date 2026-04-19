@@ -89,7 +89,7 @@
     Chart.defaults.font.family = "'Segoe UI', 'Helvetica', 'Arial', sans-serif";
     Chart.defaults.color = '#666';
 
-    // 1. GRAFIK TOP INSTANSI
+    // 1. GRAFIK TOP INSTANSI (Diperbaiki: Animasi Sumbu X)
     new Chart(document.getElementById('barInstansi').getContext('2d'), {
         type: 'bar',
         data: {
@@ -102,7 +102,21 @@
                 borderWidth: 1, borderRadius: 5
             }]
         },
-        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+        options: { 
+            indexAxis: 'y', 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { display: false } }, 
+            scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+            // --- PERBAIKAN ANIMASI HORIZONTAL ---
+            animation: {
+                x: {
+                    from: 0, // Paksa mulai dari 0 memanjang ke kanan
+                    duration: 1500, // 1.5 detik
+                    easing: 'easeOutQuart'
+                }
+            }
+        }
     });
 
     // 2. GRAFIK KATEGORI
@@ -115,10 +129,19 @@
                 backgroundColor: ['#0056b3', '#28a745', '#ffc107', '#dc3545'], hoverOffset: 4
             }]
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { position: 'bottom' } },
+            animation: {
+                animateScale: true,
+                animateRotate: true,
+                duration: 1500
+            }
+        }
     });
 
-    // 3. GRAFIK TREN BULANAN
+    // 3. GRAFIK TREN BULANAN (Diperbaiki: Lebih elegan, tidak memantul)
     const ctxLine = document.getElementById('lineBulan').getContext('2d');
     let gradient = ctxLine.createLinearGradient(0, 0, 0, 400);
     gradient.addColorStop(0, 'rgba(0, 86, 179, 0.5)'); gradient.addColorStop(1, 'rgba(0, 86, 179, 0.0)');
@@ -133,8 +156,17 @@
             }]
         },
         options: {
-            responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, grid: { borderDash: [2, 4] }, ticks: { precision: 0 } }, x: { grid: { display: false } } }
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, grid: { borderDash: [2, 4] }, ticks: { precision: 0 } }, x: { grid: { display: false } } },
+            // --- PERBAIKAN ANIMASI GARIS ---
+            animation: {
+                y: {
+                    duration: 1500, // Dipercepat sedikit jadi 1.5 detik
+                    easing: 'easeOutQuart' // Diganti ke gaya mengerem halus (tidak mantul)
+                }
+            }
         }
     });
 </script>

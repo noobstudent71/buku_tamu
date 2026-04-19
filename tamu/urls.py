@@ -27,6 +27,8 @@ urlpatterns = [
     path('master-data/', views.master_data, name='master_data'),
 
     path('master-data/hapus/<str:tipe>/<int:id>/', views.hapus_data, name='hapus_data'),
-    
+
     path('master-data/toggle/<str:tipe>/<int:id>/', views.toggle_status, name='toggle_status'),
+    
+    path('audit-trail/', views.audit_trail, name='audit_trail'),
 ]

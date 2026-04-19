@@ -29,10 +29,12 @@ def search_perusahaan(request):
 # ==========================================
 class PIC(models.Model): # Nama kelas jadi lebih singkat
     nama_lengkap = models.CharField(max_length=100, unique=True)
+    departemen = models.CharField(max_length=100, default="-") 
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return self.nama_lengkap
+        # Biar di form dropdown langsung tampil "Nama - Departemen"
+        return f"{self.nama_lengkap} - {self.departemen}" 
 
     class Meta:
         verbose_name = "PIC"
@@ -107,6 +109,7 @@ class BukuTamu(models.Model):
         ('MASUK', 'Sedang Bertamu'),
         ('SELESAI', 'Selesai Bertamu'),
         ('KELUAR', 'Sudah Checkout'),
+        ('DITOLAK', 'Ditolak/Batal'),
     ]
     KATEGORI_CHOICES = [
         ('rekan_bisnis', 'Lokal Rekan Bisnis'),
@@ -120,7 +123,7 @@ class BukuTamu(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='MENUNGGU')
     nama = models.CharField(max_length=100, verbose_name="Nama Lengkap")
     instansi = models.CharField(max_length=150, verbose_name="Nama Instansi")
-    no_hp = models.CharField(max_length=20, verbose_name="No Telfon/HP", default="-")
+    no_hp = models.CharField(max_length=20, verbose_name="No Telfon/HP")
     no_polisi = models.CharField(max_length=20, verbose_name="No Polisi Kendaraan", blank=True, null=True)
     
     # [REVISI] Upload To pakai Fungsi, bukan String lagi
@@ -217,5 +220,15 @@ class BukuTamu(models.Model):
     class Meta:
         ordering = ['-waktu_masuk']
         verbose_name_plural = "Daftar Tamu"
+
+# --- TABEL LOG AKTIVITAS (AUDIT TRAIL) ---
+class LogAktivitas(models.Model):
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    aksi = models.CharField(max_length=50) # Cth: "TAMBAH", "HAPUS", "UBAH STATUS"
+    target = models.CharField(max_length=255) # Cth: "Instansi: PT Otsuka"
+    waktu = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"[{self.waktu}] {self.user.username} - {self.aksi} - {self.target}"
 
     

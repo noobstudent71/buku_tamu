@@ -105,12 +105,9 @@
                         <div class="row mb-3">
                             <div class="col-md-8 mb-3 mb-md-0">
                                 <label class="form-label fw-bold">Ingin Bertemu Siapa? / Meet With</label>
-                                <input type="text" id="input_pencarian_pic" list="daftar_pic" class="form-control" placeholder="🔍 Ketik nama PIC..." required autocomplete="off">
+                                <input type="text" id="input_pencarian_pic" list="daftar_pic" class="form-control" placeholder="🔍 Ketik nama PIC..." required autocomplete="off" required>
                                 
                                 <datalist id="daftar_pic">
-                                    {% for p in daftar_pic %}
-                                        <option value="{{ p.nama_lengkap }}"></option>
-                                    {% endfor %}
                                 </datalist>
                                 
                                 <!-- Field asli disembunyikan -->

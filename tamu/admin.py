@@ -5,7 +5,7 @@ from .models import PIC, Instansi, BukuTamu
 
 @admin.register(PIC)
 class MasterPICAdmin(admin.ModelAdmin):
-    list_display = ('nama_lengkap', 'is_active') # Kolom yang tampil di tabel
+    list_display = ('nama_lengkap', 'departemen', 'is_active') # Kolom yang tampil di tabel
     list_filter = ('is_active',)                # Filter di samping kanan
     search_fields = ('nama_lengkap',)           # Kotak pencarian
 

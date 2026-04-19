@@ -1,150 +1,125 @@
 {% extends 'tamu/base.html' %}
+{% block title %}Arsip Buku Tamu{% endblock %}
 
-{% block title %}Arsip Tamu - Buku Tamu Otsuka{% endblock %}
-
-{% block page_header %}
-    <i class="fas fa-archive text-primary me-2"></i> Arsip Buku Tamu
-{% endblock %}
-
-{% block topbar_extra %}
-    <span class="text-muted small fw-bold bg-light px-3 py-1 rounded border">Mode Pencarian & Riwayat Lama</span>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .card-custom { border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-    .table-hover tbody tr:hover { background-color: #f8f9fa; }
-    .page-link { color: #0056b3; }
-    .page-item.active .page-link { background-color: #0056b3; border-color: #0056b3; }
-</style>
-{% endblock %}
+{% block page_header %}Arsip Buku Tamu{% endblock %}
+{% block topbar_extra %}<span class="text-muted small">Data historis seluruh kunjungan tamu</span>{% endblock %}
 
 {% block content %}
-<div class="card card-custom bg-white">
-    <div class="card-header bg-white py-3 border-bottom">
-        <div class="row align-items-center">
-            <div class="col-md-6">
-                <h5 class="m-0 fw-bold text-dark">Data Seluruh Tamu</h5>
-            </div>
-            <div class="col-md-6">
-                <form method="GET" action="">
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-end-0">
-                            <i class="fas fa-search text-muted"></i>
-                        </span>
-                        <input type="text" class="form-control bg-light border-start-0" 
-                               placeholder="Cari Nama tamu, Instansi, atau No HP..." 
-                               name="q" value="{{ query|default:'' }}">
-                        <button class="btn btn-primary fw-bold" type="submit">Cari Data</button>
-                        
-                        {% if query %}
-                        <a href="{% url 'arsip_tamu' %}" class="btn btn-danger" title="Hapus Pencarian">
-                            <i class="fas fa-times"></i>
-                        </a>
-                        {% endif %}
+<div class="card border-0 shadow-sm bg-white rounded-3 p-4">
+    
+    <div class="row g-4 mb-4">  
+        <div class="col-md-8">
+            <form method="GET" id="filterForm">
+                <div class="row g-2">
+                    
+                    <div class="col-md-8">
+                        <label class="small text-muted fw-bold mb-1">Pencarian Universal</label>
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
+                            <input type="text" name="nama" class="form-control border-start-0 text-muted" placeholder="Ketik Nama Tamu, Tiket, Instansi, atau Departemen..." value="{{ cari_nama }}">
+                        </div>
                     </div>
-                </form>
+
+                    <div class="col-md-4">
+                        <label class="small text-muted fw-bold mb-1">Filter Tanggal</label>
+                        <input type="date" name="tanggal" class="form-control text-muted shadow-sm" value="{{ cari_tanggal }}">
+                    </div>
+
+                </div>
+                
+                <div class="d-flex align-items-center mt-2">
+                    <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">
+                        <i class="fas fa-filter me-1"></i> Terapkan Filter
+                    </button>
+                    <a href="{% url 'arsip_tamu' %}" class="small text-decoration-none ms-3 text-muted fw-bold" style="transition: 0.2s;">
+                        <i class="fas fa-undo me-1"></i>Reset filter
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border border-success shadow-sm h-100 rounded-3" style="background-color: #f8fbff;">
+                <div class="card-body p-4 d-flex flex-column justify-content-center text-center">
+                    <div class="small fw-bold text-success text-uppercase mb-3">
+                        <i class="fas fa-print me-2"></i>Menu Laporan
+                    </div>
+                    <button type="button" class="btn btn-success fw-bold w-100 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDownload">
+                        <i class="fas fa-file-excel me-2"></i> Download Excel
+                    </button>
+                </div>
             </div>
         </div>
+
+    </div>
+    <hr class="text-muted opacity-25 mb-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="fw-bold text-dark"><i class="fas fa-list me-2"></i>Daftar Kunjungan</span>
+        <span class="badge bg-light text-dark border">Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}</span>
     </div>
 
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light text-center text-secondary small text-uppercase">
-                    <tr>
-                        <th class="py-3">No. Tiket</th>
-                        <th class="py-3">Tanggal & Jam</th>
-                        <th class="py-3">Kategori</th>
-                        <th class="py-3 text-start ps-4">Info Tamu</th>
-                        <th class="py-3 text-start">Tujuan</th>
-                        <th class="py-3">Barang Bawaan</th>
-                        <th class="py-3">Status Terakhir</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for tamu in page_obj %}
-                    <tr>
-                        <td class="text-center fw-bold text-primary font-monospace">{{ tamu.nomor_tiket }}</td>
-                        <td class="text-center">
-                            <div class="fw-bold text-dark">{{ tamu.waktu_masuk|date:"d M Y" }}</div>
-                            <div class="small text-muted">{{ tamu.waktu_masuk|date:"H:i" }} WIB</div>
-                        </td>
-                        <td class="text-center">
-                            <span class="badge bg-info text-dark bg-opacity-25 border border-info">{{ tamu.get_kategori_tamu_display }}</span>
-                        </td>
-                        <td class="ps-4">
-                            <div class="fw-bold text-dark mb-1">{{ tamu.nama }}</div>
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="badge bg-light text-secondary border"><i class="fas fa-building me-1"></i> {{ tamu.instansi }}</span>
-                                <span class="badge bg-light text-secondary border"><i class="fas fa-phone me-1"></i> {{ tamu.no_hp }}</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="fw-bold text-dark">{{ tamu.pic_tuju.nama_lengkap }}</div>
-                            <div class="small text-muted fst-italic">"{{ tamu.keperluan|truncatechars:30 }}"</div>
-                        </td>
-                        <td class="text-center">
-                            {% if tamu.bawa_barang %}
-                                <div class="fw-bold text-dark small">{{ tamu.bawa_barang }}</div>
-                                <div class="badge bg-secondary text-white" style="font-size: 0.7rem;">Qty: {{ tamu.jumlah_barang }}</div>
-                            {% else %}
-                                <span class="text-muted small">-</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
-                            {% if tamu.status == 'MENUNGGU' %}
-                                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">⏳ Menunggu</span>
-                            {% elif tamu.status == 'MASUK' %}
-                                <span class="badge bg-success px-3 py-2 rounded-pill">✅ Sedang Bertamu</span>
-                            {% elif tamu.status == 'KELUAR' %}
-                                <span class="badge bg-secondary px-3 py-2 rounded-pill">🚪 Sudah Keluar</span>
-                                {% if tamu.waktu_keluar %}
-                                <div class="small text-success mt-1 fw-bold">{{ tamu.waktu_keluar|date:"H:i" }}</div>
-                                {% endif %}
-                            {% else %}
-                                <span class="badge bg-dark px-3 py-2 rounded-pill">🏁 Selesai</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center py-5">
-                            <div class="mb-3 text-muted" style="font-size: 3rem;"><i class="fas fa-search"></i></div>
-                            <h5 class="text-muted">Data tidak ditemukan</h5>
-                            <p class="small text-muted">Coba ubah kata kunci pencarian Anda.</p>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle" style="font-size: 0.85rem;">
+            <thead class="table-light text-muted border-bottom">
+                <tr>
+                    <th class="py-3">TANGGAL & JAM</th>
+                    <th>NO. TIKET</th>
+                    <th>NAMA TAMU & INSTANSI</th>
+                    <th>TUJUAN (PIC & DEPT)</th>
+                    <th>STATUS AKHIR</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tamu in page_obj %}
+                <tr>
+                    <td class="text-muted">
+                        <div class="fw-bold text-dark">{{ tamu.waktu_masuk|date:"d M Y" }}</div>
+                        <div class="small">{{ tamu.waktu_masuk|date:"H:i" }} WIB</div>
+                    </td>
+                    <td><span class="text-primary fw-bold">{{ tamu.nomor_tiket }}</span></td>
+                    
+                    <td>
+                        <div class="fw-bold text-dark">
+                            {{ tamu.nama }} 
+                            <span class="badge bg-light text-dark border ms-1" title="Jumlah Tamu">
+                                <i class="fas fa-users text-primary me-1"></i>{{ tamu.jumlah_tamu }} Org
+                            </span>
+                        </div>
+                        <div class="small text-muted mb-1"><i class="fas fa-building me-1"></i>{{ tamu.instansi }}</div>
+                        
+                        {% if tamu.bawa_barang %}
+                        <span class="badge bg-warning text-dark small shadow-sm mt-1">
+                            <i class="fas fa-box-open me-1"></i>Membawa: {{ tamu.jumlah_barang }} {{ tamu.bawa_barang }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <div class="fw-bold text-dark text-uppercase">{{ tamu.pic_tuju.nama_lengkap|default:"-" }}</div>
+                        <div class="small text-muted"><i class="fas fa-briefcase me-1"></i>{{ tamu.pic_tuju.departemen|default:"-" }}</div>
+                    </td>
+                    <td>
+                        {% if tamu.status == 'KELUAR' %}
+                            <span class="badge bg-secondary">SUDAH KELUAR</span>
+                            <div class="small text-muted mt-1">{{ tamu.waktu_keluar|date:"H:i" }} WIB</div>
+                        {% elif tamu.status == 'MASUK' %}
+                            <span class="badge bg-success">SEDANG BERTAMU</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">{{ tamu.status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center py-5 text-muted">Data tamu tidak ditemukan.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 
-    <div class="card-footer bg-white py-3">
-        <div class="d-flex justify-content-between align-items-center">
-            <div class="small text-muted">
-                Halaman <b>{{ page_obj.number }}</b> dari <b>{{ page_obj.paginator.num_pages }}</b> 
-                (Total: {{ page_obj.paginator.count }} Data)
-            </div>
-            {% if page_obj.paginator.num_pages > 1 %}
-            <nav aria-label="Page navigation">
-                <ul class="pagination m-0">
-                    {% if page_obj.has_previous %}
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">Sebelumnya</a></li>
-                    {% else %}
-                    <li class="page-item disabled"><span class="page-link">Sebelumnya</span></li>
-                    {% endif %}
-                    <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
-                    {% if page_obj.has_next %}
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">Berikutnya</a></li>
-                    {% else %}
-                    <li class="page-item disabled"><span class="page-link">Berikutnya</span></li>
-                    {% endif %}
-                </ul>
-            </nav>
-            {% endif %}
+    <div class="d-flex justify-content-center mt-4">
         </div>
-    </div>
 </div>
+
+{% include 'tamu/modal_excel.html' %}
 {% endblock %}

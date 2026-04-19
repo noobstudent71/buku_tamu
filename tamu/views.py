@@ -22,6 +22,12 @@ from django.contrib.auth import logout
 from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
 from django.contrib.auth.models import User, Group
+from .models import Instansi, PIC, BukuTamu, LogAktivitas
+from django.db import IntegrityError
+from django.contrib.auth.signals import user_logged_in, user_logged_out
+from django.dispatch import receiver
+from django.contrib.auth.models import User, Group
+
 
 def search_perusahaan(request):
     # Tangkap huruf yang sedang diketik user (misal: "Otsu")
@@ -40,7 +46,6 @@ def search_perusahaan(request):
     return JsonResponse(data, safe=False)
 
 
-
 def login_view(request):
     if request.method == 'POST':
         u = request.POST.get('username')
@@ -50,13 +55,20 @@ def login_view(request):
         
         if user is not None:
             login(request, user)
-            # LOGIKA PENGALIHAN (REDIRECT) BERDASARKAN GRUP
+            
+            # --- 1. CEK SURAT PENGANTAR (?next=) ---
+            # Jika URL memiliki akhiran ?next=/master-data/, tangkap tujuannya
+            next_url = request.GET.get('next') 
+            if next_url:
+                return redirect(next_url) # Langsung luncurkan ke halaman yang dia tuju!
+            
+            # --- 2. JIKA LOGIN BIASA (TANPA ?next=), PAKAI JALUR DEFAULT ---
             if user.groups.filter(name='SATPAM').exists():
-                return redirect('daftar_tamu') # Ke halaman monitor tamu
+                return redirect('daftar_tamu') 
             elif user.groups.filter(name='KANTOR').exists() or user.is_superuser:
-                return redirect('dashboard_analytics') # Ke halaman grafik
+                return redirect('dashboard_analytics') 
             else:
-                return redirect('pendaftaran_tamu') # Default
+                return redirect('pendaftaran_tamu') 
         else:
             messages.error(request, "Username atau Password salah!")
             
@@ -102,39 +114,64 @@ def arsip_tamu(request):
     # 1. Ambil SEMUA data (urutkan dari yang terbaru)
     tamu_list = BukuTamu.objects.all().order_by('-created_at')
 
-    # 2. Fitur Pencarian (Search) YANG AMAN
-    query = request.GET.get('q')
-    
-    if query:
-        # Cek apakah yang diketik user itu ANGKA? (Misal: "006" atau "6")
-        if query.isdigit():
-            # Jika angka, cari berdasarkan ID (ini pengganti pencarian nomor tiket)
-            # ATAU cari nomor HP juga boleh
-            tamu_list = tamu_list.filter(
-                Q(id=int(query)) | 
-                Q(no_hp__icontains=query)
-            )
-        else:
-            # Jika HURUF (Misal: "Budi" or "Unibraw"), cari Nama & Instansi
-            tamu_list = tamu_list.filter(
-                Q(nama__icontains=query) | 
-                Q(instansi__icontains=query)
-            )
+    # 2. Tangkap data dari Filter UI (Kita sisakan 2 saja: pencarian universal & tanggal)
+    cari_nama = request.GET.get('nama', '')  # Ini sekarang bertugas sebagai penangkap Omni-Search
+    cari_tanggal = request.GET.get('tanggal', '')
 
-    # 3. Fitur Pagination (Bagi per 20 data per halaman)
+    # 3. Eksekusi Filter
+    if cari_nama:
+        from django.db.models import Q
+        # Logika Sapu Jagat: Cari di semua kolom sekaligus
+        tamu_list = tamu_list.filter(
+            Q(nama__icontains=cari_nama) | 
+            Q(no_hp__icontains=cari_nama) |
+            Q(instansi__icontains=cari_nama) |
+            Q(pic_tuju__nama_lengkap__icontains=cari_nama) |
+            Q(pic_tuju__departemen__icontains=cari_nama)
+        )
+        
+    if cari_tanggal:
+        tamu_list = tamu_list.filter(waktu_masuk__date=cari_tanggal)
+
+    # 4. Fitur Pagination (20 data per halaman)
     paginator = Paginator(tamu_list, 20) 
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    return render(request, 'tamu/arsip_tamu.html', {'page_obj': page_obj, 'query': query})
-# --- VIEW 1: Form Pendaftaran (Kode Anda) ---
+    context = {
+        'page_obj': page_obj,
+        'cari_nama': cari_nama, # Tetap pakai variabel ini agar HTML tidak error
+        'cari_tanggal': cari_tanggal,
+    }
+    return render(request, 'tamu/arsip_tamu.html', context)
+
+# --- VIEW 1: Form Pendaftaran (Di sinilah Langkah 2 dipasang!) ---
 def pendaftaran_tamu(request):
     if request.method == 'POST':
-        form = TamuForm(request.POST, request.FILES)
+        # 1. Bikin 'copy' dari data form agar bisa kita edit di tengah jalan
+        data_post = request.POST.copy()
+        
+        # 2. Tangkap ketikan tamu (Contoh: "Budi - HRD")
+        nama_pic_input = request.POST.get('pic_tuju', '')
+        pic_obj = None
+        
+        # 3. --- LOGIKA LANGKAH 2: POTONG NAMA DAN DEPARTEMEN ---
+        if nama_pic_input:
+            if " - " in nama_pic_input:
+                nama_asli, dept_asli = nama_pic_input.split(" - ", 1)
+                pic_obj = PIC.objects.filter(nama_lengkap=nama_asli.strip(), departemen=dept_asli.strip(), is_active=True).first()
+            else:
+                pic_obj = PIC.objects.filter(nama_lengkap=nama_pic_input.strip(), is_active=True).first()
+        
+        # 4. Jika PIC ketemu, ganti teks "Budi - HRD" menjadi ID-nya Pak Budi
+        if pic_obj:
+            data_post['pic_tuju'] = pic_obj.id
+
+        # 5. Lanjutkan proses save form seperti biasa dengan data yang sudah di-"hack"
+        form = TamuForm(data_post, request.FILES)
         
         if form.is_valid():
             tamu = form.save(commit=False)
-            # (Baris daftar_instansi di sini sudah dihapus karena tidak berguna)
             
             # --- LOGIKA STATUS ---
             if tamu.sudah_janji:
@@ -146,28 +183,28 @@ def pendaftaran_tamu(request):
             
             tamu.save()
             return redirect('pendaftaran_tamu')
+        else:
+            messages.error(request, "Gagal menyimpan data! Pastikan Nama PIC dipilih dari daftar.")
+            
     else:
         form = TamuForm()
 
-    # ---> AMBIL DATA DARI DATABASE <---
+    # ---> AMBIL DATA DARI DATABASE UNTUK REKOMENDASI (DATALIST) <---
     daftar_pic = PIC.objects.filter(is_active=True)
     daftar_instansi = Instansi.objects.all()
 
-    # ---> BUNGKUS KE DALAM CONTEXT <---
     context = {
         'form': form,
         'daftar_pic': daftar_pic,
         'daftar_instansi': daftar_instansi,
     }
 
-    # ---> KIRIM CONTEXT KE HTML (INI YANG BENAR!) <---
     return render(request, 'tamu/form_tamu.html', context)
 
 # --- VIEW 2: Dashboard Monitor (Kode Anda) ---
 @login_required(login_url='login')
 def daftar_tamu(request):
-    # 1. Siapkan Query Dasar (Semua Data, Diurutkan Prioritas & Waktu)
-    #    Kita TIDAK memfilter tanggal hari ini, supaya data lama (Feb 10) tetap muncul.
+  
     base_query = BukuTamu.objects.annotate(
         urutan_prioritas=Case(
             When(status='MENUNGGU', then=Value(1)), # Prioritas 1: Menunggu
@@ -216,11 +253,18 @@ def ubah_status(request, id, status_baru):
     tamu = get_object_or_404(BukuTamu, id=id)
     tamu.status = status_baru
     
-    if status_baru == 'KELUAR':
+    # Jika tamu keluar ATAU ditolak masuk, catat jam keluarnya saat ini juga
+    if status_baru == 'KELUAR' or status_baru == 'DITOLAK':
         tamu.waktu_keluar = timezone.now()
+        
     tamu.save()
     
-    messages.success(request, f'Status {tamu.nama} diperbarui menjadi {status_baru}')
+    # Notifikasi yang menyesuaikan
+    if status_baru == 'DITOLAK':
+        messages.error(request, f'Kedatangan {tamu.nama} telah ditolak.')
+    else:
+        messages.success(request, f'Status {tamu.nama} diperbarui menjadi {status_baru}')
+        
     return redirect('daftar_tamu')
 
 
@@ -231,7 +275,8 @@ def download_excel(request):
     end_date = request.GET.get('end_date')
 
     if not start_date or not end_date:
-        return render(request, 'tamu/laporan.html')
+        messages.warning(request, "⚠️ Silakan pilih rentang tanggal terlebih dahulu!")
+        return redirect('arsip_tamu')
 
     try:
         start_dt = make_aware(datetime.strptime(f"{start_date} 00:00:00", "%Y-%m-%d %H:%M:%S"))
@@ -313,10 +358,12 @@ def download_excel(request):
             nama_ktp = os.path.basename(tamu.foto_ktp.name) if tamu.foto_ktp else "-"
             nama_selfie = os.path.basename(tamu.foto_wajah.name) if tamu.foto_wajah else "-"
 
+            nama_pic_excel = tamu.pic_tuju.nama_lengkap if tamu.pic_tuju else "-"
+
             row_data = [
                 index, tamu.nomor_tiket, kategori_label, tanggal_saja, jam_masuk, jam_keluar,
                 tamu.nama, tamu.no_hp, tamu.instansi, tamu.no_polisi, 
-                tamu.pic_tuju.nama_lengkap, tamu.jumlah_tamu, tamu.keperluan, 
+                nama_pic_excel, tamu.jumlah_tamu, tamu.keperluan, # <--- SUDAH AMAN
                 status_janji, tamu.bawa_barang, tamu.jumlah_barang,
             ]
 
@@ -338,6 +385,9 @@ def download_excel(request):
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename=Laporan_Tamu_Otsuka_{start_date}.xlsx'
     wb.save(response)
+    # Catat ke Audit Trail
+   # Catat ke Audit Trail
+    LogAktivitas.objects.create(user=request.user, aksi="EXPORT", target="Laporan Analytics (Excel)")
     
     return response
 
@@ -367,7 +417,11 @@ def bersihkan_nama_instansi(teks_mentah):
 # --- VIEW 5: DASHBOARD ANALITIK (GRAFIK) ---
 @login_required(login_url='login') 
 def dashboard_analytics(request):
-    # Gunakan timezone bawaan Django agar tidak muncul warning Naive Datetime
+    # --- GEMBOK KEAMANAN KANTOR ---
+    if not (request.user.is_superuser or request.user.groups.filter(name='KANTOR').exists()):
+        messages.error(request, "AKSES DITOLAK: Halaman Analytics khusus untuk Staff Kantor.")
+        return redirect('daftar_tamu')
+    # ------------------------------
     from django.utils import timezone 
     
     # 1. Ambil tahun dari request (Default: tahun saat ini)
@@ -451,79 +505,159 @@ def dashboard_analytics(request):
 
 @login_required(login_url='login')
 def master_data(request):
+    # --- GEMBOK KEAMANAN KANTOR ---
+    if not (request.user.is_superuser or request.user.groups.filter(name='KANTOR').exists()):
+        messages.error(request, "AKSES DITOLAK: Halaman Master Data khusus untuk Staff Kantor.")
+        return redirect('daftar_tamu')
+    # ------------------------------
+
     if request.method == 'POST':
         tipe_data = request.POST.get('tipe_data')
         
-        # --- LOGIKA TAMBAH AKUN (USER) ---
         if tipe_data == 'akun':
             username = request.POST.get('username')
             password = request.POST.get('password')
-            role = request.POST.get('role') # SATPAM atau KANTOR
-            
+            role = request.POST.get('role')
             if username and password:
-                # 1. Cek apakah username sudah ada
                 if User.objects.filter(username=username).exists():
                     messages.error(request, f"Username '{username}' sudah terdaftar!")
                 else:
-                    # 2. Buat User baru (Password akan di-hash/enkripsi otomatis)
                     user_baru = User.objects.create_user(username=username, password=password)
-                    
-                    # 3. Masukkan ke Grup sesuai Role
                     group, created = Group.objects.get_or_create(name=role)
                     user_baru.groups.add(group)
-                    
+                    # --- REKAM LOG ---
+                    LogAktivitas.objects.create(user=request.user, aksi="TAMBAH", target=f"Akun Login: {username} ({role})")
                     messages.success(request, f"Akun {role} '{username}' berhasil dibuat!")
 
-        # --- LOGIKA TAMBAH INSTANSI ---
         elif tipe_data == 'instansi':
             nama_baru = request.POST.get('nama_standar')
             kata_kunci = request.POST.get('kata_kunci', '')
             if nama_baru:
                 Instansi.objects.create(nama_standar=nama_baru, kata_kunci=kata_kunci)
+                # --- REKAM LOG ---
+                LogAktivitas.objects.create(user=request.user, aksi="TAMBAH", target=f"Instansi: {nama_baru}")
                 messages.success(request, f"Instansi '{nama_baru}' berhasil ditambahkan!")
                 
-        # --- LOGIKA TAMBAH PIC ---
         elif tipe_data == 'pic':
             nama_baru = request.POST.get('nama_lengkap')
+            dept_baru = request.POST.get('departemen', 'Umum')
             if nama_baru:
-                PIC.objects.create(nama_lengkap=nama_baru, is_active=True)
-                messages.success(request, f"PIC '{nama_baru}' berhasil ditambahkan!")
+                PIC.objects.create(nama_lengkap=nama_baru, departemen=dept_baru, is_active=True)
+                # --- REKAM LOG ---
+                LogAktivitas.objects.create(user=request.user, aksi="TAMBAH", target=f"PIC: {nama_baru} ({dept_baru})")
+                messages.success(request, f"PIC '{nama_baru}' ({dept_baru}) berhasil ditambahkan!")
+
+        # === TAMBAHKAN BLOK KODE INI UNTUK FITUR EDIT ===
+        elif tipe_data == 'edit_pic':
+            pic_id = request.POST.get('pic_id')
+            nama_baru = request.POST.get('nama_lengkap')
+            dept_baru = request.POST.get('departemen', 'UMUM')
+            
+            if pic_id and nama_baru:
+                pic_obj = get_object_or_404(PIC, id=pic_id)
+                nama_lama = pic_obj.nama_lengkap
                 
+                # Update datanya
+                pic_obj.nama_lengkap = nama_baru
+                pic_obj.departemen = dept_baru
+                pic_obj.save()
+                
+            # --- KODE BARU UNTUK EDIT INSTANSI ---
+        elif tipe_data == 'edit_instansi':
+            instansi_id = request.POST.get('instansi_id')
+            nama_baru = request.POST.get('nama_standar')
+            kunci_baru = request.POST.get('kata_kunci', '')
+            
+            if instansi_id and nama_baru:
+                ins_obj = get_object_or_404(Instansi, id=instansi_id) # Sesuaikan nama Model Instansi-nya
+                nama_lama = ins_obj.nama_standar
+                
+                # Update data
+                ins_obj.nama_standar = nama_baru
+                ins_obj.kata_kunci = kunci_baru
+                ins_obj.save()
+                
+                # Catat ke Audit Trail
+                LogAktivitas.objects.create(user=request.user, aksi="UBAH", target=f"Instansi: {nama_lama} -> {nama_baru}")
+                messages.success(request, f"Instansi '{nama_baru}' berhasil diperbarui!")
+
+        # --- KODE BARU UNTUK EDIT AKUN LOGIN ---
+        elif tipe_data == 'edit_akun':
+            akun_id = request.POST.get('akun_id')
+            username_baru = request.POST.get('username')
+            password_baru = request.POST.get('password')
+            role_baru = request.POST.get('role')
+            
+            if akun_id and username_baru:
+                user_obj = get_object_or_404(User, id=akun_id)
+                username_lama = user_obj.username
+                
+                # Update username
+                user_obj.username = username_baru
+                
+                # Update password HANYA JIKA diisi
+                if password_baru:
+                    user_obj.set_password(password_baru)
+                
+                user_obj.save()
+                
+                # Update Role (Hak Akses)
+                if role_baru:
+                    user_obj.groups.clear() # Hapus role lama
+                    group, created = Group.objects.get_or_create(name=role_baru)
+                    user_obj.groups.add(group)
+                
+                # Catat ke Audit Trail
+                LogAktivitas.objects.create(user=request.user, aksi="UBAH", target=f"Akun: {username_lama} -> {username_baru} ({role_baru})")
+                messages.success(request, f"Data Akun '{username_baru}' berhasil diperbarui!")   
+
         return redirect('master_data')
 
-    # Data untuk tabel
-    daftar_instansi = Instansi.objects.all().order_by('nama_standar')
-    daftar_pic = PIC.objects.all().order_by('nama_lengkap')
-    daftar_user = User.objects.all().order_by('-date_joined') # Ambil semua akun
-
     context = {
-        'daftar_instansi': daftar_instansi,
-        'daftar_pic': daftar_pic,
-        'daftar_user': daftar_user,
+        'daftar_instansi': Instansi.objects.all().order_by('nama_standar'),
+        'daftar_pic': PIC.objects.all().order_by('nama_lengkap'),
+        'daftar_user': User.objects.all().order_by('-date_joined'),
     }
     return render(request, 'tamu/master_data.html', context)
 
 # --- VIEW 7: HAPUS DATA MASTER ---
 @login_required(login_url='login')
 def hapus_data(request, tipe, id):
+    # --- GEMBOK KEAMANAN KANTOR ---
+    if not (request.user.is_superuser or request.user.groups.filter(name='KANTOR').exists()):
+        messages.error(request, "AKSES DITOLAK: Halaman Master Data khusus untuk Staff Kantor.")
+        return redirect('daftar_tamu')
+    # ------------------------------
     if tipe == 'instansi':
         obj = get_object_or_404(Instansi, id=id)
         nama = obj.nama_standar
         obj.delete()
+        LogAktivitas.objects.create(user=request.user, aksi="HAPUS", target=f"Instansi: {nama}")
+        messages.success(request, f"Data '{nama}' berhasil dihapus.")
+        
     elif tipe == 'pic':
         obj = get_object_or_404(PIC, id=id)
         nama = obj.nama_lengkap
         obj.delete()
+        LogAktivitas.objects.create(user=request.user, aksi="HAPUS", target=f"PIC: {nama}")
+        messages.success(request, f"Data '{nama}' berhasil dihapus.")
+        
     elif tipe == 'akun':
         obj = get_object_or_404(User, id=id)
         nama = obj.username
-        # Jangan izinkan menghapus akun admin utama
         if obj.is_superuser:
             messages.error(request, "Akun Super Admin tidak boleh dihapus!")
             return redirect('master_data')
-        obj.delete()
-        
-    messages.success(request, f"Data '{nama}' berhasil dihapus secara permanen.")
+            
+        # PENGAMANAN ERROR DATABASE (TRY-EXCEPT)
+        try:
+            obj.delete()
+            LogAktivitas.objects.create(user=request.user, aksi="HAPUS", target=f"Akun Login: {nama}")
+            messages.success(request, f"Akun '{nama}' berhasil dihapus permanen.")
+        except IntegrityError:
+            # Jika database menolak karena akun sudah punya sejarah
+            messages.error(request, f"GAGAL: Akun '{nama}' tidak bisa dihapus karena memiliki riwayat aktivitas. Silakan gunakan tombol NONAKTIFKAN!")
+            
     return redirect('master_data')
 
 # --- VIEW 8: UBAH STATUS AKTIF/NONAKTIF ---
@@ -531,9 +665,10 @@ def hapus_data(request, tipe, id):
 def toggle_status(request, tipe, id):
     if tipe == 'pic':
         obj = get_object_or_404(PIC, id=id)
-        obj.is_active = not obj.is_active # Balikkan statusnya
+        obj.is_active = not obj.is_active
         obj.save()
         status_str = "Diaktifkan" if obj.is_active else "Dinonaktifkan"
+        LogAktivitas.objects.create(user=request.user, aksi="UBAH STATUS", target=f"PIC: {obj.nama_lengkap} -> {status_str}")
         messages.success(request, f"Status PIC '{obj.nama_lengkap}' berhasil {status_str}.")
         
     elif tipe == 'akun':
@@ -541,10 +676,56 @@ def toggle_status(request, tipe, id):
         if obj.is_superuser:
             messages.error(request, "Status Super Admin tidak boleh diubah!")
             return redirect('master_data')
-            
-        obj.is_active = not obj.is_active # Balikkan statusnya
+        obj.is_active = not obj.is_active
         obj.save()
         status_str = "Diaktifkan" if obj.is_active else "Dinonaktifkan"
+        LogAktivitas.objects.create(user=request.user, aksi="UBAH STATUS", target=f"Akun Login: {obj.username} -> {status_str}")
         messages.success(request, f"Akun '{obj.username}' berhasil {status_str}.")
         
     return redirect('master_data')
+
+# --- VIEW 9: HALAMAN AUDIT TRAIL ---
+from django.core.paginator import Paginator
+@login_required(login_url='login')
+def audit_trail(request):
+    if not (request.user.is_superuser or request.user.groups.filter(name='KANTOR').exists()):
+        messages.error(request, "AKSES DITOLAK.")
+        return redirect('daftar_tamu')
+
+    logs_list = LogAktivitas.objects.all().order_by('-waktu')
+
+    # 1. Tangkap data dari form pencarian
+    cari_user = request.GET.get('user', '')
+    cari_aksi = request.GET.get('aksi', 'Semua')
+    cari_tanggal = request.GET.get('tanggal', '')
+
+    # 2. Eksekusi Filter
+    if cari_user:
+        logs_list = logs_list.filter(user__username__icontains=cari_user)
+    if cari_aksi != 'Semua':
+        logs_list = logs_list.filter(aksi=cari_aksi)
+    if cari_tanggal:
+        logs_list = logs_list.filter(waktu__date=cari_tanggal)
+
+    # 3. Paginasi
+    paginator = Paginator(logs_list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj, 
+        'cari_user': cari_user, 
+        'cari_aksi': cari_aksi,
+        'cari_tanggal': cari_tanggal, 
+    }
+    return render(request, 'tamu/audit_trail.html', context)    
+
+# --- SENSOR OTOMATIS LOGIN & LOGOUT ---
+@receiver(user_logged_in)
+def catat_login(sender, request, user, **kwargs):
+    LogAktivitas.objects.create(user=user, aksi="LOGIN", target="-")
+
+@receiver(user_logged_out)
+def catat_logout(sender, request, user, **kwargs):
+    LogAktivitas.objects.create(user=user, aksi="LOGOUT", target="-")
+    

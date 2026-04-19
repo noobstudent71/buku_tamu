@@ -1,137 +1,184 @@
 {% extends 'tamu/base.html' %}
-
-{% block title %}Live Monitor - Buku Tamu Otsuka{% endblock %}
+{% block title %}Live Monitor Security{% endblock %}
 
 {% block page_header %}
     <i class="fas fa-desktop text-primary me-2"></i> Live Monitor Security
 {% endblock %}
 
-{% block topbar_extra %}
-    <span class="badge bg-dark px-3 py-2 fs-6 shadow-sm" id="jam-digital"></span>
-{% endblock %}
-
 {% block extra_css %}
 <style>
-    .bg-prioritas { background-color: #f8fff9; border-left: 5px solid #28a745; }
-    .img-thumb { width: 45px; height: 45px; object-fit: cover; border-radius: 5px; cursor: pointer; border: 1px solid #ddd; }
-    table { font-size: 0.9rem; }
-    
-    .stat-card { border-radius: 10px; border: none; transition: transform 0.3s; }
-    .stat-card:hover { transform: scale(1.02); }
-    .icon-stat { font-size: 2.5rem; opacity: 0.3; }
-
-    /* TOMBOL STOP ALARM */
-    #kotak-alarm {
-        display: none; position: fixed; bottom: 0; left: 0; width: 100%;
-        background-color: #dc3545; color: white; text-align: center; padding: 20px;
-        z-index: 9999; box-shadow: 0 -5px 20px rgba(0,0,0,0.3); animation: kedip 1s infinite;
-    }
-    @keyframes kedip { 0% { background-color: #dc3545; } 50% { background-color: #a71d2a; } 100% { background-color: #dc3545; } }
-    .btn-stop {
-        background-color: white; color: #dc3545; font-weight: bold; font-size: 1.5rem;
-        padding: 10px 40px; border-radius: 50px; border: none; cursor: pointer;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-    }
+    /* Tambahan efek melayang saat kotak disentuh mouse */
+    .card-hover { transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; cursor: pointer; }
+    .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.15) !important; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
+<div class="row g-3 mb-4">
     
-    <div class="col-lg-9 mb-4">
-        <div class="card shadow border-0">
-            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="m-0 fw-bold text-primary"><i class="fas fa-clipboard-list me-2"></i>Daftar Kedatangan Tamu</h5>
-                <button onclick="window.location.reload();" class="btn btn-sm btn-outline-secondary">
-                    <i class="fas fa-sync-alt me-1"></i>Refresh Data
-                </button>
+    <div class="col-md-4">
+        <a href="{% url 'daftar_tamu' %}" class="text-decoration-none">
+            <div class="card bg-primary text-white border-0 shadow-sm h-100 rounded-3 card-hover">
+                <div class="card-body p-4 d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="small fw-bold text-uppercase mb-1">Semua Tamu</div>
+                        <h2 class="m-0 fw-bold">{{ total_tamu }}</h2>
+                    </div>
+                    <i class="fas fa-users fa-3x opacity-50"></i>
+                </div>
             </div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="?status=masuk" class="text-decoration-none">
+            <div class="card bg-success text-white border-0 shadow-sm h-100 rounded-3 card-hover">
+                <div class="card-body p-4 d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="small fw-bold text-uppercase mb-1">Sedang Bertamu</div>
+                        <h2 class="m-0 fw-bold">{{ sedang_bertamu }}</h2>
+                    </div>
+                    <i class="fas fa-building fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="?status=keluar" class="text-decoration-none">
+            <div class="card bg-secondary text-white border-0 shadow-sm h-100 rounded-3 card-hover">
+                <div class="card-body p-4 d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="small fw-bold text-uppercase mb-1">Sudah Pulang</div>
+                        <h2 class="m-0 fw-bold">{{ sudah_pulang }}</h2>
+                    </div>
+                    <i class="fas fa-home fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </a>
+    </div>
+
+</div>
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold m-0 text-primary"><i class="fas fa-list-alt me-2"></i>Daftar Kedatangan Tamu</h5>
+                <a href="{% url 'daftar_tamu' %}" class="btn btn-sm btn-light border text-muted"><i class="fas fa-sync-alt me-1"></i>Refresh Data</a>
+            </div>
+            
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover mb-0" id="tabelTamu">
-                        <thead class="table-dark text-center align-middle">
+                    <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                        <thead class="table-dark text-white">
                             <tr>
-                                <th>No. Tiket</th>
+                                <th class="py-3 ps-3">No. Tiket</th>
                                 <th>Jam Masuk</th>
                                 <th>Jam Keluar</th>
                                 <th>Info Tamu</th>
+                                <th>Foto Identitas</th>
                                 <th>Tujuan</th>
                                 <th>Janji</th>
-                                <th>Foto</th>
-                                <th style="width: 15%;">Aksi</th>
+                                <th>Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for tamu in tamu_list %}
-                            <tr class="{% if tamu.sudah_janji %}bg-prioritas{% endif %}">
-                                <td class="text-center fw-bold align-middle">{{ tamu.nomor_tiket }}</td>
+                            <tr class="border-bottom">
+                                <td class="ps-3 fw-bold text-dark">{{ tamu.nomor_tiket }}</td>
                                 
-                                <td class="text-center text-success align-middle">
-                                    <div class="fw-bold fs-6">{{ tamu.waktu_masuk|date:"H:i" }}</div>
-                                    <small class="text-muted" style="font-size: 0.7rem;">{{ tamu.waktu_masuk|date:"d M" }}</small>
+                                <td>
+                                    <div class="fw-bold text-success">{{ tamu.waktu_masuk|date:"H:i" }}</div>
+                                    <div class="small text-muted">{{ tamu.waktu_masuk|date:"d M" }}</div>
                                 </td>
-
-                                <td class="text-center align-middle">
+                                
+                                <td>
                                     {% if tamu.waktu_keluar %}
-                                        <div class="fw-bold text-danger fs-6">{{ tamu.waktu_keluar|date:"H:i" }}</div>
+                                        <div class="fw-bold text-danger">{{ tamu.waktu_keluar|date:"H:i" }}</div>
                                     {% else %}
-                                        <span class="fw-bold text-muted fs-4">-</span>
+                                        <span class="text-muted">-</span>
                                     {% endif %}
+                                </td>
+                                
+                                <td>
+                                    <div class="fw-bold text-dark">
+                                        {{ tamu.nama }} 
+                                        <span class="badge bg-light text-dark border ms-1" title="Jumlah Rombongan">
+                                            <i class="fas fa-users me-1"></i>{{ tamu.jumlah_tamu }} Org
+                                        </span>
+                                    </div>
+                                    <div class="small text-muted"><i class="fas fa-building me-1"></i>{{ tamu.instansi }}</div>
+                                    <div class="small text-primary"><i class="fas fa-phone-alt me-1"></i>{{ tamu.no_hp }}</div>
+                                    
+                                    <div class="mt-1 d-flex gap-1 flex-wrap">
+                                        {% if tamu.no_polisi %}
+                                        <span class="badge bg-dark"><i class="fas fa-car me-1"></i>{{ tamu.no_polisi }}</span>
+                                        {% endif %}
+                                        
+                                        {% if tamu.bawa_barang %}
+                                        <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-box-open me-1"></i>{{ tamu.jumlah_barang }}x {{ tamu.bawa_barang }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
                                 </td>
 
-                                <td class="align-middle">
-                                    <div class="fw-bold">{{ tamu.nama }}</div>
-                                    <div class="small text-muted">{{ tamu.instansi }}</div>
-                                    <div class="small text-primary"><i class="fas fa-phone-alt me-1" style="font-size: 0.7rem;"></i>{{ tamu.no_hp }}</div>
-                                    {% if tamu.no_polisi %}
-                                        <span class="badge bg-dark mt-1" style="font-size: 0.65rem;"><i class="fas fa-car me-1"></i>{{ tamu.no_polisi }}</span>
-                                    {% endif %}
-                                </td>
-                                
-                                <td class="align-middle">
-                                    <strong>{{ tamu.pic_tuju.nama_lengkap }}</strong><br>
-                                    <small class="text-muted fst-italic">"{{ tamu.keperluan }}"</small>
-                                </td>
-                                
-                                <td class="text-center align-middle">
-                                    {% if tamu.sudah_janji %}
-                                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>YA</span>
-                                    {% else %}
-                                        <span class="badge bg-warning text-dark"><i class="fas fa-exclamation-triangle me-1"></i>TDK</span>
-                                    {% endif %}
-                                </td>
-                                
-                                <td class="text-center align-middle">
-                                    <div class="d-flex justify-content-center gap-1">
-                                        {% if tamu.foto_ktp %}
-                                            <a href="{{ tamu.foto_ktp.url }}" target="_blank"><img src="{{ tamu.foto_ktp.url }}" class="img-thumb border-secondary" title="KTP"></a>
-                                        {% endif %}
+                                <td>
+                                    <div class="d-flex gap-2">
                                         {% if tamu.foto_wajah %}
-                                            <a href="{{ tamu.foto_wajah.url }}" target="_blank"><img src="{{ tamu.foto_wajah.url }}" class="img-thumb border-info" title="Selfie"></a>
+                                        <img src="{{ tamu.foto_wajah.url }}" class="img-thumbnail rounded shadow-sm" style="width: 45px; height: 45px; object-fit: cover; cursor: pointer;" onclick="lihatFoto('{{ tamu.foto_wajah.url }}', 'Foto Wajah - {{ tamu.nama }}')" title="Klik untuk perbesar Wajah">
+                                        {% endif %}
+                                        
+                                        {% if tamu.foto_ktp %}
+                                        <img src="{{ tamu.foto_ktp.url }}" class="img-thumbnail rounded shadow-sm" style="width: 45px; height: 45px; object-fit: cover; cursor: pointer;" onclick="lihatFoto('{{ tamu.foto_ktp.url }}', 'Foto KTP - {{ tamu.nama }}')" title="Klik untuk perbesar KTP">
                                         {% endif %}
                                     </div>
                                 </td>
                                 
-                                <td class="text-center align-middle">
-                                    {% if tamu.status == 'MENUNGGU' %}
-                                        <div class="d-grid gap-2">
-                                            <a href="{% url 'ubah_status' tamu.id 'MASUK' %}" class="btn btn-success btn-sm fw-bold shadow-sm">✅ TERIMA</a>
-                                            <a href="{% url 'ubah_status' tamu.id 'DITOLAK' %}" class="btn btn-outline-danger btn-sm fw-bold shadow-sm" onclick="return confirm('Yakin tolak tamu ini?');">❌ TOLAK</a>
-                                        </div>
-                                    {% elif tamu.status == 'MASUK' %}
-                                        <a href="{% url 'ubah_status' tamu.id 'KELUAR' %}" class="btn btn-danger btn-sm w-100 fw-bold shadow-sm" onclick="return confirm('Checkout tamu ini?');">🚪 CHECKOUT</a>
+                                <td>
+                                    <div class="fw-bold text-dark text-uppercase">{{ tamu.pic_tuju.nama_lengkap|default:"-" }}</div>
+                                    <div class="small text-muted"><i class="fas fa-briefcase me-1"></i>{{ tamu.pic_tuju.departemen|default:"-" }}</div>
+                                    <div class="small text-muted fst-italic">"{{ tamu.keperluan }}"</div>
+                                </td>
+                                
+                                <td>
+                                    {% if tamu.sudah_janji %}
+                                        <span class="badge bg-success"><i class="fas fa-check me-1"></i> YA</span>
                                     {% else %}
-                                        <div class="badge bg-secondary py-2 px-3 fw-bold w-100 shadow-sm" style="font-size: 0.85rem;">🏁 SELESAI</div>
+                                        <span class="badge bg-warning text-dark"><i class="fas fa-exclamation-triangle me-1"></i> TDK</span>
+                                    {% endif %}
+                                </td>
+                                
+                                <td>
+                                    {% if tamu.status == 'MENUNGGU' %}
+                                        <div class="d-flex gap-1">
+                                            <a href="{% url 'ubah_status' tamu.id 'MASUK' %}" class="btn btn-sm btn-success fw-bold shadow-sm" title="Izinkan Masuk" onclick="return confirm('Izinkan tamu ini masuk ke area gedung?');">
+                                                <i class="fas fa-check"></i> IZINKAN
+                                            </a>
+                                            <a href="{% url 'ubah_status' tamu.id 'DITOLAK' %}" class="btn btn-sm btn-danger fw-bold shadow-sm" title="Tolak Tamu" onclick="return confirm('Yakin ingin menolak tamu ini?');">
+                                                <i class="fas fa-times"></i> TOLAK
+                                            </a>
+                                        </div>
+                                        
+                                    {% elif tamu.status == 'MASUK' %}
+                                        <a href="{% url 'ubah_status' tamu.id 'KELUAR' %}" class="btn btn-sm btn-secondary fw-bold shadow-sm" onclick="return confirm('Apakah tamu ini sudah selesai dan keluar gedung?');">
+                                            <i class="fas fa-door-open me-1"></i> SELESAI
+                                        </a>
+                                        
+                                    {% elif tamu.status == 'DITOLAK' %}
+                                        <button class="btn btn-sm btn-outline-danger disabled fw-bold" style="opacity: 1;">
+                                            <i class="fas fa-ban me-1"></i> DITOLAK
+                                        </button>
+                                        
+                                    {% else %}
+                                        <button class="btn btn-sm btn-light border text-muted disabled fw-bold">
+                                            <i class="fas fa-check-circle me-1"></i> SELESAI
+                                        </button>
                                     {% endif %}
                                 </td>
                             </tr>
                             {% empty %}
-                            <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
-                                    <i class="fas fa-folder-open fs-1 mb-3 opacity-50"></i><br>
-                                    Belum ada tamu hari ini.
-                                </td>
-                            </tr>
+                            <tr><td colspan="8" class="text-center py-5 text-muted">Belum ada data tamu.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -139,114 +186,38 @@
             </div>
         </div>
     </div>
+</div>
 
-    <div class="col-lg-3">
-        <a href="?status=masuk" class="text-decoration-none">
-            <div class="card stat-card bg-success text-white shadow mb-3">
-                <div class="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-uppercase mb-1 small fw-bold opacity-75">Sedang Bertamu</h6>
-                        <h2 class="mb-0 fw-bold">{{ sedang_bertamu }}</h2>
-                    </div>
-                    <div class="icon-stat"><i class="fas fa-building"></i></div>
-                </div>
+<div class="modal fade" id="modalFoto" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-header border-0 pb-0 d-flex justify-content-between">
+                <h5 class="modal-title text-white fw-bold shadow-sm" id="modalFotoTitle" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">Detail Foto</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-        </a>
-
-        <a href="?status=keluar" class="text-decoration-none">
-            <div class="card stat-card bg-secondary text-white shadow mb-3">
-                <div class="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-uppercase mb-1 small fw-bold opacity-75">Sudah Pulang</h6>
-                        <h2 class="mb-0 fw-bold">{{ sudah_pulang }}</h2>
-                    </div>
-                    <div class="icon-stat"><i class="fas fa-home"></i></div>
-                </div>
-            </div>
-        </a>
-
-        <div class="card shadow border-0 mt-4">
-            <div class="card-header bg-white fw-bold py-3 text-primary">
-                <i class="fas fa-print me-2"></i>Menu Laporan
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#modalDownload">
-                        <i class="fas fa-file-excel me-1"></i> Download Excel
-                    </button>
-                </div>
+            <div class="modal-body text-center">
+                <img id="gambarFull" src="" class="img-fluid rounded shadow-lg" style="max-height: 80vh; border: 3px solid white;">
             </div>
         </div>
     </div>
 </div>
 
-<div id="kotak-alarm">
-    <h2 class="mb-3"><i class="fas fa-bell me-2"></i>ADA TAMU BARU! MOHON DICEK!</h2>
-    <button onclick="matikanAlarm()" class="btn-stop"><i class="fas fa-bell-slash me-2"></i>MATIKAN ALARM</button>
-</div>
-
-{% include 'tamu/modal_excel.html' %}
-
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // FUNGSI 1: REFRESH OTOMATIS SETIAP 30 DETIK (Menggantikan meta tag lama)
+    function lihatFoto(url, judul) {
+        document.getElementById('gambarFull').src = url;
+        document.getElementById('modalFotoTitle').innerText = judul;
+        var modalViewer = new bootstrap.Modal(document.getElementById('modalFoto'));
+        modalViewer.show();
+    }
+
     setTimeout(function() {
-        window.location.reload();
-    }, 30000);
-
-    // FUNGSI 2: ALARM SUARA
-    let loopingSuara = null;
-
-    document.addEventListener("DOMContentLoaded", function() {
-        let rows = document.querySelectorAll("#tabelTamu tbody tr");
-        let currentCount = rows.length;
-        if (rows.length === 1 && rows[0].innerText.includes("Belum ada tamu")) currentCount = 0;
-
-        let lastCount = localStorage.getItem('total_tamu');
-        let statusAlarm = localStorage.getItem('status_alarm');
-
-        if (lastCount !== null) {
-            lastCount = parseInt(lastCount);
-            if (currentCount > lastCount) {
-                localStorage.setItem('status_alarm', 'NYALA');
-                statusAlarm = 'NYALA';
-            }
+        // Jangan auto-reload kalau modal foto sedang terbuka, biar satpam tidak kaget
+        if (!document.getElementById('modalFoto').classList.contains('show')) {
+            window.location.reload();
         }
-        
-        localStorage.setItem('total_tamu', currentCount);
-        if (statusAlarm === 'NYALA') nyalakanModeBahaya();
-    });
-
-    function nyalakanModeBahaya() {
-        document.getElementById('kotak-alarm').style.display = 'block';
-        document.title = "🔔 TAMU BARU!!";
-        putarSuara();
-        if (!loopingSuara) loopingSuara = setInterval(putarSuara, 5000);
-    }
-
-    function putarSuara() {
-        if (localStorage.getItem('status_alarm') !== 'NYALA') return;
-        let pesan = new SpeechSynthesisUtterance("Perhatian. Ada tamu baru di lobi.");
-        pesan.lang = 'id-ID'; pesan.rate = 1;
-        window.speechSynthesis.speak(pesan);
-    }
-
-    function matikanAlarm() {
-        window.speechSynthesis.cancel();
-        if (loopingSuara) { clearInterval(loopingSuara); loopingSuara = null; }
-        document.getElementById('kotak-alarm').style.display = 'none';
-        document.title = "Live Monitor - Buku Tamu Otsuka";
-        localStorage.setItem('status_alarm', 'MATI');
-    }
-
-    // FUNGSI 3: JAM DIGITAL DI TOPBAR
-    function updateJam() {
-        let el = document.getElementById('jam-digital');
-        if(el) el.innerText = new Date().toLocaleTimeString('id-ID');
-    }
-    setInterval(updateJam, 1000); 
-    updateJam();
+    }, 5000);
 </script>
 {% endblock %}

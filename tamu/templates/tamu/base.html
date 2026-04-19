@@ -162,24 +162,35 @@
                 </a>
             </li>
 
+            {% if request.user.is_superuser or request.user.groups.all.0.name == 'KANTOR' %}
+            
+            <li class="mt-4 mb-2 px-4 text-uppercase text-muted fw-bold" style="font-size: 0.75rem;">
+                Administrasi
+            </li>
+
             <li>
                 <a href="{% url 'dashboard_analytics' %}" class="{% if request.resolver_match.url_name == 'dashboard_analytics' %}active{% endif %}">
                     <i class="fas fa-chart-pie"></i>
                     <span>Analytics</span>
                 </a>
             </li>
-
-            <li class="mt-4 mb-2 px-4 text-uppercase text-muted fw-bold" style="font-size: 0.75rem;">
-                Administrasi
-            </li>
-
+            
             <li>
                 <a href="{% url 'master_data' %}" class="{% if request.resolver_match.url_name == 'master_data' %}active{% endif %}">
                     <i class="fas fa-database"></i>
                     <span>Master Data</span>
                 </a>
             </li>
-        </ul>
+
+            <li>
+                <a href="{% url 'audit_trail' %}" class="{% if request.resolver_match.url_name == 'audit_trail' %}active{% endif %}">
+                    <i class="fas fa-history"></i>
+                    <span>Audit Trail</span>
+                </a>
+            </li>
+            
+            {% endif %}
+            </ul>
 
         <div class="sidebar-footer">
             <a href="{% url 'logout' %}" class="btn btn-light w-100 fw-bold text-danger border d-flex justify-content-center align-items-center gap-2">

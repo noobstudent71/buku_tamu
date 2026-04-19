@@ -26,21 +26,28 @@
                                 <th class="text-center">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {% for item in daftar_instansi %}
-                            <tr>
-                                <td class="fw-bold">{{ item.nama_standar }}</td>
-                                <td class="small text-muted">{{ item.kata_kunci }}</td>
-                                <td class="text-center">
-                                    <a href="{% url 'hapus_data' 'instansi' item.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin ingin menghapus Instansi {{ item.nama_standar }}?');" title="Hapus Permanen">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr><td colspan="3" class="text-center text-muted py-3">Belum ada data.</td></tr>
-                            {% endfor %}
-                        </tbody>
+                            <tbody>
+    {% for item in daftar_instansi %}
+    <tr>
+        <td class="fw-bold">{{ item.nama_standar }}</td>
+        <td class="small text-muted">{{ item.kata_kunci }}</td>
+        <td class="text-center">
+            <button class="btn btn-sm btn-outline-primary me-1" title="Edit Data" 
+                onclick="editInstansi('{{ item.id }}', '{{ item.nama_standar }}', '{{ item.kata_kunci }}')" 
+                data-bs-toggle="modal" data-bs-target="#modalEditInstansi">
+                <i class="fas fa-edit"></i>
+            </button>
+
+            <a href="{% url 'hapus_data' 'instansi' item.id %}" class="btn btn-sm btn-outline-danger" 
+                onclick="return confirm('⚠️ PERINGATAN KERAS!\n\nMenghapus instansi {{ item.nama_standar }} akan menghilangkannya dari daftar rekomendasi form tamu.\n\nApakah Anda YAKIN ingin menghapus permanen?');" title="Hapus Permanen">
+                <i class="fas fa-trash"></i>
+            </a>
+        </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="3" class="text-center text-muted py-3">Belum ada data.</td></tr>
+    {% endfor %}
+</tbody>
                     </table>
                 </div>
             </div>
@@ -58,37 +65,39 @@
             <div class="card-body p-0">
                 <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light sticky-top">
-                            <tr>
-                                <th>Nama PIC</th>
-                                <th class="text-center">Status</th>
-                                <th class="text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for p in daftar_pic %}
-                            <tr>
-                                <td class="fw-bold">{{ p.nama_lengkap }}</td>
-                                <td class="text-center">
-                                    {% if p.is_active %}
-                                        <span class="badge bg-success">Aktif</span>
-                                    {% else %}
-                                        <span class="badge bg-danger">Nonaktif</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-center">
-                                    <a href="{% url 'toggle_status' 'pic' p.id %}" class="btn btn-sm btn-outline-warning me-1" title="Ubah Status Aktif/Nonaktif">
-                                        <i class="fas fa-power-off"></i>
-                                    </a>
-                                    <a href="{% url 'hapus_data' 'pic' p.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Hanya hapus jika PIC ini BELUM PERNAH menerima tamu. Yakin hapus {{ p.nama_lengkap }}?');" title="Hapus Permanen">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr><td colspan="3" class="text-center text-muted py-3">Belum ada data.</td></tr>
-                            {% endfor %}
-                        </tbody>
+                                            <thead class="table-light sticky-top">
+    <tr>
+        <th>Nama PIC</th>
+        <th>Departemen</th>
+        <th class="text-center">Aksi</th>
+    </tr>
+</thead>
+<tbody>
+    {% for p in daftar_pic %}
+    <tr>
+        <td class="fw-bold text-dark">{{ p.nama_lengkap }}</td>
+        <td><span class="badge bg-info text-dark"><i class="fas fa-briefcase me-1"></i> {{ p.departemen|default:"UMUM" }}</span></td>
+        
+        <td class="text-center">
+            
+            <button class="btn btn-sm btn-outline-primary me-1" title="Edit Data" 
+                onclick="editPIC('{{ p.id }}', '{{ p.nama_lengkap }}', '{{ p.departemen }}')" 
+                data-bs-toggle="modal" data-bs-target="#modalEditPIC">
+                <i class="fas fa-edit"></i>
+            </button>
+
+            <a href="{% url 'hapus_data' 'pic' p.id %}" class="btn btn-sm btn-outline-danger" 
+                onclick="return confirm('⚠️ PERINGATAN KERAS!\n\nMenghapus {{ p.nama_lengkap }} akan membuat nama beliau HILANG (-) di Laporan Excel pada tamu-tamu sebelumnya!\n\nApakah Anda YAKIN ingin menghapus permanen?');" title="Hapus Permanen">
+                <i class="fas fa-trash"></i>
+            </a>
+
+        </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="3" class="text-center text-muted py-3">Belum ada data.</td></tr>
+    {% endfor %}
+</tbody>
+                        
                     </table>
                 </div>
             </div>
@@ -108,51 +117,47 @@
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Username</th>
-                                <th>Hak Akses (Role)</th>
-                                <th>Tanggal Dibuat</th>
-                                <th>Status</th>
-                                <th class="text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for u in daftar_user %}
-                            <tr>
-                                <td class="fw-bold">{{ u.username }}</td>
-                                <td>
-                                    {% for group in u.groups.all %}
-                                        <span class="badge bg-outline-primary border border-primary text-primary">{{ group.name }}</span>
-                                    {% empty %}
-                                        <span class="badge bg-secondary">No Group</span>
-                                    {% endfor %}
-                                </td>
-                                <td class="small text-muted">{{ u.date_joined|date:"d M Y, H:i" }}</td>
-                                <td>
-                                    {% if u.is_active %}
-                                        <span class="text-success small fw-bold"><i class="fas fa-check-circle"></i> Aktif</span>
-                                    {% else %}
-                                        <span class="text-danger small fw-bold"><i class="fas fa-times-circle"></i> Nonaktif</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-center">
-                                    {% if not u.is_superuser %}
-                                    <a href="{% url 'toggle_status' 'akun' u.id %}" class="btn btn-sm btn-outline-warning me-1" title="Ubah Akses Login">
-                                        <i class="fas fa-user-lock"></i>
-                                    </a>
-                                    <a href="{% url 'hapus_data' 'akun' u.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin menghapus akun {{ u.username }}?');">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                    {% else %}
-                                    <span class="badge bg-dark">Super Admin</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr><td colspan="5" class="text-center text-muted py-3">Belum ada akun terdaftar.</td></tr>
-                            {% endfor %}
-                        </tbody>
+                                            <thead class="table-light">
+    <tr>
+        <th>Username</th>
+        <th>Hak Akses (Role)</th>
+        <th>Tanggal Dibuat</th>
+        <th class="text-center">Aksi</th>
+    </tr>
+</thead>
+<tbody>
+    {% for u in daftar_user %}
+    <tr>
+        <td class="fw-bold">{{ u.username }}</td>
+        <td>
+            {% for group in u.groups.all %}
+                <span class="badge bg-outline-primary border border-primary text-primary">{{ group.name }}</span>
+            {% empty %}
+                <span class="badge bg-secondary">SATPAM</span>
+            {% endfor %}
+        </td>
+        <td class="small text-muted">{{ u.date_joined|date:"d M Y, H:i" }}</td>
+        <td class="text-center">
+            {% if not u.is_superuser %}
+            <button class="btn btn-sm btn-outline-primary me-1" title="Edit Akun" 
+                onclick="editAkun('{{ u.id }}', '{{ u.username }}', '{% if u.groups.all %}{{ u.groups.all.0.name }}{% else %}SATPAM{% endif %}')" 
+                data-bs-toggle="modal" data-bs-target="#modalEditAkun">
+                <i class="fas fa-edit"></i>
+            </button>
+
+            <a href="{% url 'hapus_data' 'akun' u.id %}" class="btn btn-sm btn-outline-danger" 
+                onclick="return confirm('⚠️ PERINGATAN KERAS!\n\nMenghapus akun {{ u.username }} bersifat permanen dan tidak bisa dikembalikan!\n(Catatan aktivitas di audit trail akan tetap aman).\n\nYakin menghapus akun ini?');">
+                <i class="fas fa-trash"></i>
+            </a>
+            {% else %}
+            <span class="badge bg-dark">Super Admin</span>
+            {% endif %}
+        </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" class="text-center text-muted py-3">Belum ada akun terdaftar.</td></tr>
+    {% endfor %}
+</tbody>
                     </table>
                 </div>
             </div>
@@ -204,6 +209,10 @@
                         <label class="form-label fw-bold">Nama Lengkap PIC</label>
                         <input type="text" name="nama_lengkap" class="form-control" required>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted small">Departemen</label>
+                        <input type="text" name="departemen" class="form-control" placeholder="Contoh: HRD, IT, Keuangan..." required>
+                    </div>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -249,4 +258,143 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalEditPIC" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow-lg">
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="tipe_data" value="edit_pic">
+                
+                <input type="hidden" name="pic_id" id="edit_pic_id"> 
+                
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Edit Data PIC</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nama Lengkap PIC</label>
+                        <input type="text" name="nama_lengkap" id="edit_pic_nama" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted small">Departemen</label>
+                        <input type="text" name="departemen" id="edit_pic_dept" class="form-control" required>
+                    </div>
+                    
+                    <div class="alert alert-warning small mb-0 mt-3 border-warning">
+                        <i class="fas fa-exclamation-triangle me-1"></i> Perubahan nama akan otomatis mengubah data rekomendasi di halaman form tamu.
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary fw-bold">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditInstansi" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow-lg">
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="tipe_data" value="edit_instansi">
+                <input type="hidden" name="instansi_id" id="edit_instansi_id"> 
+                
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Edit Data Instansi</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nama Standar (Paten)</label>
+                        <input type="text" name="nama_standar" id="edit_instansi_nama" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Kata Kunci Pencarian</label>
+                        <input type="text" name="kata_kunci" id="edit_instansi_kunci" class="form-control" placeholder="Contoh: ub, brawijaya">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary fw-bold">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditAkun" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow-lg">
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="tipe_data" value="edit_akun">
+                <input type="hidden" name="akun_id" id="edit_akun_id"> 
+                
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-user-edit me-2"></i>Edit Akun Login</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Username</label>
+                        <input type="text" name="username" id="edit_akun_username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-danger">Password Baru <small class="text-muted fw-normal">(Kosongkan jika tidak diubah)</small></label>
+                        <input type="password" name="password" class="form-control" placeholder="Ketik password baru jika ingin mengubah...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Hak Akses / Role</label>
+                        <select name="role" id="edit_akun_role" class="form-select" required>
+                            <option value="SATPAM">SATPAM (Akses Monitor Tamu)</option>
+                            <option value="KANTOR">KANTOR (Akses Analitik & Grafik)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-danger fw-bold">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Fungsi melempar data ke modal Instansi
+    function editInstansi(id, nama, kunci) {
+        document.getElementById('edit_instansi_id').value = id;
+        document.getElementById('edit_instansi_nama').value = nama;
+        document.getElementById('edit_instansi_kunci').value = kunci !== 'None' ? kunci : '';
+    }
+
+    // Fungsi melempar data ke modal Akun
+    function editAkun(id, username, role) {
+        document.getElementById('edit_akun_id').value = id;
+        document.getElementById('edit_akun_username').value = username;
+        
+        if (role && role !== 'None') {
+            document.getElementById('edit_akun_role').value = role.toUpperCase();
+        } else {
+            document.getElementById('edit_akun_role').value = 'SATPAM'; // Default
+        }
+    }
+
+    // Fungsi untuk menyuntikkan data lama ke dalam Modal Edit saat tombol biru diklik
+    function editPIC(id, nama, dept) {
+        document.getElementById('edit_pic_id').value = id;
+        document.getElementById('edit_pic_nama').value = nama;
+        
+        // Cek jika departemennya 'UMUM' (default), jangan ditulis 'None' atau kosong
+        if (dept && dept !== 'None') {
+            document.getElementById('edit_pic_dept').value = dept;
+        } else {
+            document.getElementById('edit_pic_dept').value = 'UMUM';
+        }
+    }
+</script>
 {% endblock %}
