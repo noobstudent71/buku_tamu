@@ -224,11 +224,13 @@ class BukuTamu(models.Model):
 # --- TABEL LOG AKTIVITAS (AUDIT TRAIL) ---
 class LogAktivitas(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    aksi = models.CharField(max_length=50) # Cth: "TAMBAH", "HAPUS", "UBAH STATUS"
-    target = models.CharField(max_length=255) # Cth: "Instansi: PT Otsuka"
+    role = models.CharField(max_length=50, null=True, blank=True) # BARU: Menyimpan role saat aksi dilakukan
+    aksi = models.CharField(max_length=50) 
+    target = models.CharField(max_length=255, null=True, blank=True) 
+    ip_address = models.GenericIPAddressField(null=True, blank=True) # BARU: Menyimpan IP Address perangkat
     waktu = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"[{self.waktu}] {self.user.username} - {self.aksi} - {self.target}"
+        return f"{self.user} - {self.aksi} - {self.waktu}"
 
     

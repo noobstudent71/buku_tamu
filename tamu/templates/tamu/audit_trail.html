@@ -1,88 +1,112 @@
 {% extends 'tamu/base.html' %}
-{% block title %}Audit Log Aktivitas{% endblock %}
+{% block title %}Audit Log Aktivitas - IT Mode{% endblock %}
 
-{% block page_header %}Audit Log Aktivitas{% endblock %}
-{% block topbar_extra %}<span class="text-muted small">Pantau aktivitas admin dan perubahan data</span>{% endblock %}
+{% block page_header %}
+    <i class="fas fa-user-secret text-primary me-2"></i> Audit Log Aktivitas
+{% endblock %}
+{% block topbar_extra %}<span class="text-muted small">Pantau aktivitas sistem dan perubahan data (Mode IT)</span>{% endblock %}
 
 {% block content %}
 <div class="card border-0 shadow-sm bg-white rounded-3 p-4">
-    
-    <form method="GET" id="filterForm">
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <label class="small text-muted fw-bold mb-1">User (Username)</label>
-                <input type="text" name="user" class="form-control text-muted" placeholder="Masukkan Username" value="{{ cari_user }}">
-            </div>
-            <div class="col-md-4">
-                <label class="small text-muted fw-bold mb-1">Action</label>
-                <select name="aksi" class="form-select text-muted">
-                    <option value="Semua">Semua</option>
-                    <option value="LOGIN" {% if cari_aksi == 'LOGIN' %}selected{% endif %}>LOGIN</option>
-                    <option value="LOGOUT" {% if cari_aksi == 'LOGOUT' %}selected{% endif %}>LOGOUT</option>
-                    <option value="TAMBAH" {% if cari_aksi == 'TAMBAH' %}selected{% endif %}>TAMBAH</option>
-                    <option value="HAPUS" {% if cari_aksi == 'HAPUS' %}selected{% endif %}>HAPUS</option>
-                    <option value="EXPORT" {% if cari_aksi == 'EXPORT' %}selected{% endif %}>EXPORT</option>
-                    <option value="UBAH STATUS" {% if cari_aksi == 'UBAH STATUS' %}selected{% endif %}>UBAH STATUS</option>
-                </select>
-            </div>
-            <div class="col-md-4">
-                <label class="small text-muted fw-bold mb-1">Cari Tanggal</label>
-                <input type="date" name="tanggal" class="form-control text-muted" value="{{ cari_tanggal }}">
-            </div>
+    <form method="GET" class="row g-2 mb-4">
+        <div class="col-md-4">
+            <label class="small fw-bold text-muted mb-1">User (Username)</label>
+            <input type="text" name="user" class="form-control" placeholder="Masukkan Username..." value="{{ request.GET.user }}">
         </div>
-
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <span class="small text-muted">Menampilkan halaman {{ page_obj.number }}</span>
-            <div class="d-flex gap-2 align-items-center">
-                <button type="submit" class="btn btn-sm btn-primary px-3">Terapkan Filter</button>
-                <a href="{% url 'audit_trail' %}" class="small text-decoration-none ms-2 text-muted">Reset filter</a>
-            </div>
+        <div class="col-md-4">
+            <label class="small fw-bold text-muted mb-1">Action</label>
+            <select name="action" class="form-select">
+                <option value="">Semua</option>
+                <option value="LOGIN" {% if request.GET.action == 'LOGIN' %}selected{% endif %}>LOGIN</option>
+                <option value="LOGOUT" {% if request.GET.action == 'LOGOUT' %}selected{% endif %}>LOGOUT</option>
+                <option value="TAMBAH" {% if request.GET.action == 'TAMBAH' %}selected{% endif %}>TAMBAH</option>
+                <option value="UBAH" {% if request.GET.action == 'UBAH' %}selected{% endif %}>UBAH</option>
+                <option value="HAPUS" {% if request.GET.action == 'HAPUS' %}selected{% endif %}>HAPUS</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="small fw-bold text-muted mb-1">Cari Tanggal</label>
+            <input type="date" name="tanggal" class="form-control" value="{{ request.GET.tanggal }}">
+        </div>
+        <div class="col-12 d-flex justify-content-end align-items-center mt-3 gap-2">
+            <span class="small text-muted me-auto">Menampilkan riwayat keamanan sistem</span>
+            <button type="submit" class="btn btn-primary px-4 fw-bold">Terapkan Filter</button>
+            <a href="{% url 'audit_trail' %}" class="small text-muted text-decoration-none hover-primary ms-2">Reset filter</a>
         </div>
     </form>
 
     <div class="table-responsive">
-        <table class="table table-borderless align-middle" style="font-size: 0.85rem;">
-            <thead class="border-bottom text-muted">
+        <table class="table table-hover align-middle" style="font-size: 0.85rem;">
+            <thead class="table-light text-muted border-bottom">
                 <tr>
-                    <th class="py-2">Waktu</th>
+                    <th class="py-3">Waktu</th>
                     <th>User</th>
                     <th>Role</th>
                     <th>Action</th>
                     <th>Target / Resource</th>
+                    <th>IP Address</th>
                 </tr>
             </thead>
             <tbody>
                 {% for log in page_obj %}
-                <tr class="border-bottom">
+                <tr>
                     <td class="text-muted">{{ log.waktu|date:"d/m/Y, H:i:s" }} WIB</td>
-                    <td class="text-muted fw-bold text-primary">{{ log.user.username }}</td>
-                    <td class="text-muted">
-                        {% if log.user.is_superuser %}ADMIN{% elif log.user.groups.all %}{{ log.user.groups.first.name }}{% else %}UNKNOWN{% endif %}
-                    </td>
+                    <td class="fw-bold text-dark">{{ log.user.username|default:"System/Deleted" }}</td>
+                    <td class="text-muted">{{ log.role|default:"-" }}</td>
                     <td>
-                        <span class="text-primary fw-bold">{{ log.aksi }}</span>
+                        {% if log.aksi == 'LOGIN' or log.aksi == 'LOGOUT' %}
+                            <span class="text-primary fw-bold">{{ log.aksi }}</span>
+                        {% elif log.aksi == 'HAPUS' %}
+                            <span class="text-danger fw-bold">{{ log.aksi }}</span>
+                        {% elif log.aksi == 'TAMBAH' %}
+                            <span class="text-success fw-bold">{{ log.aksi }}</span>
+                        {% else %}
+                            <span class="text-info fw-bold">{{ log.aksi }}</span>
+                        {% endif %}
                     </td>
-                    <td class="text-muted">{{ log.target }}</td>
+                    <td class="text-muted">{{ log.target|default:"-" }}</td>
+                    <td class="font-monospace text-muted">{{ log.ip_address|default:"-" }}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" class="text-center py-4 text-muted">Data log tidak ditemukan.</td></tr>
+                <tr><td colspan="6" class="text-center py-4 text-muted">Belum ada riwayat aktivitas.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-
-    <div class="d-flex justify-content-center mt-3">
-        <div class="btn-group">
-            {% if page_obj.has_previous %}
-                <a href="?page={{ page_obj.previous_page_number }}&user={{ cari_user }}&aksi={{ cari_aksi }}&tanggal={{ cari_tanggal }}" class="btn btn-sm btn-light border text-muted"><i class="fas fa-chevron-left"></i> Sebelumnya</a>
-            {% endif %}
-            
-            <span class="btn btn-sm btn-light border disabled text-muted">Halaman {{ page_obj.number }}</span>
-            
-            {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}&user={{ cari_user }}&aksi={{ cari_aksi }}&tanggal={{ cari_tanggal }}" class="btn btn-sm btn-light border text-muted">Berikutnya <i class="fas fa-chevron-right"></i></a>
-            {% endif %}
-        </div>
-    </div>
 </div>
+<div class="d-flex justify-content-center mt-4 mb-2">
+        <nav aria-label="Page navigation">
+            <ul class="pagination pagination-sm shadow-sm mb-0">
+                
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link text-primary fw-bold" href="?page=1&user={{ cari_user }}&aksi={{ cari_aksi }}&tanggal={{ cari_tanggal }}" title="Halaman Pertama">&laquo; Awal</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link text-primary" href="?page={{ page_obj.previous_page_number }}&user={{ cari_user }}&aksi={{ cari_aksi }}&tanggal={{ cari_tanggal }}">Sebelumnya</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link text-muted">&laquo; Awal</span></li>
+                <li class="page-item disabled"><span class="page-link text-muted">Sebelumnya</span></li>
+                {% endif %}
+
+                <li class="page-item active" aria-current="page">
+                    <span class="page-link bg-primary border-primary fw-bold px-3">Hal {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}</span>
+                </li>
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link text-primary" href="?page={{ page_obj.next_page_number }}&user={{ cari_user }}&aksi={{ cari_aksi }}&tanggal={{ cari_tanggal }}">Selanjutnya</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link text-primary fw-bold" href="?page={{ page_obj.paginator.num_pages }}&user={{ cari_user }}&aksi={{ cari_aksi }}&tanggal={{ cari_tanggal }}" title="Halaman Terakhir">Akhir &raquo;</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link text-muted">Selanjutnya</span></li>
+                <li class="page-item disabled"><span class="page-link text-muted">Akhir &raquo;</span></li>
+                {% endif %}
+                
+            </ul>
+        </nav>
+    </div>
 {% endblock %}

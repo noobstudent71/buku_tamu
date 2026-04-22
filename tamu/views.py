@@ -561,6 +561,19 @@ def master_data(request):
                 pic_obj.nama_lengkap = nama_baru
                 pic_obj.departemen = dept_baru
                 pic_obj.save()
+
+                # --- INI BAGIAN YANG TADI TERPOTONG/HILANG ---
+                ip = get_client_ip(request)
+                role = request.user.groups.first().name if request.user.groups.exists() else 'SUPER ADMIN'
+                LogAktivitas.objects.create(
+                    user=request.user, 
+                    role=role.upper(), 
+                    aksi="UBAH", 
+                    target=f"PIC: {nama_lama} -> {nama_baru} ({dept_baru})",
+                    ip_address=ip
+                )
+                messages.success(request, f"Data PIC '{nama_lama}' berhasil diubah menjadi '{nama_baru}'!")
+                # ---------------------------------------------
                 
             # --- KODE BARU UNTUK EDIT INSTANSI ---
         elif tipe_data == 'edit_instansi':
@@ -720,12 +733,27 @@ def audit_trail(request):
     }
     return render(request, 'tamu/audit_trail.html', context)    
 
-# --- SENSOR OTOMATIS LOGIN & LOGOUT ---
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+# --- SENSOR OTOMATIS LOGIN & LOGOUT (VERSI UPGRADE IT MODE) ---
 @receiver(user_logged_in)
 def catat_login(sender, request, user, **kwargs):
-    LogAktivitas.objects.create(user=user, aksi="LOGIN", target="-")
+    ip = get_client_ip(request) # Ambil IP Address
+    role = user.groups.first().name if user.groups.exists() else 'SUPER ADMIN' # Ambil Role
+    
+    # Simpan ke database beserta IP dan Role-nya
+    LogAktivitas.objects.create(user=user, role=role.upper(), aksi="LOGIN", target="-", ip_address=ip)
 
 @receiver(user_logged_out)
 def catat_logout(sender, request, user, **kwargs):
-    LogAktivitas.objects.create(user=user, aksi="LOGOUT", target="-")
+    ip = get_client_ip(request) # Ambil IP Address
+    role = user.groups.first().name if user.groups.exists() else 'SUPER ADMIN' # Ambil Role
     
+    # Simpan ke database beserta IP dan Role-nya
+    LogAktivitas.objects.create(user=user, role=role.upper(), aksi="LOGOUT", target="-", ip_address=ip)
